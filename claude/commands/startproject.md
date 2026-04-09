@@ -52,7 +52,10 @@ $ARGUMENTS の形式: "{task description} --tier={S|M|L} --task-file={TASK_FILE}
 
 ## PHASE 2: RESEARCH & DESIGN
 
-**tier によって動作を切り替える。成果物はすべて TASK_FILE の `Design` セクションに書き込む。外部ファイルは作成しない。**
+**以下のいずれかに該当する場合は tier に関係なく OpenCode に相談する:**
+- $ARGUMENTS に「opencodeに相談」「opencode相談」「opencodeで設計」等のキーワードを含む
+
+**それ以外は、tier によって動作を切り替える。成果物はすべて TASK_FILE の `Design` セクションに書き込む。外部ファイルは作成しない。**
 
 ### tier=S
 スキップ → Phase 3 へ進む。
