@@ -147,7 +147,9 @@
       "Bash(git rebase *)",
       "Bash(rm *)"
     ],
-    "defaultMode": "dontAsk"
+  },
+  "env": {
+    "CLAUDE_CODE_DISABLE_ADAPTIVE_THINKING": 1
   },
   "alwaysThinkingEnabled": true,
   "skipDangerousModePermissionPrompt": true,
