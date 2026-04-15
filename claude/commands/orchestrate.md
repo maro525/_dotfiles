@@ -2,7 +2,6 @@
 name: orchestrate
 description: Project orchestrator — classify tier, create task file, run startproject → team-implement → team-review → deploy in sequence.
 context: fork
-agent: Plan
 allowed-tools: Read, Write, Edit, Bash, Grep, Glob, Agent, Skill, AskUserQuestion, TodoWrite, mcp__linear-server__get_issue, mcp__linear-server__save_issue, mcp__linear-server__save_comment, mcp__linear-server__list_issue_statuses
 ---
 
