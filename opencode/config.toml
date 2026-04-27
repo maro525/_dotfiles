@@ -1,0 +1,22 @@
+# OpenCode CLI Project Configuration
+# This file enables project-specific OpenCode settings
+
+# Default model configuration
+model = "github-copilot/gpt-5.4"
+model_reasoning_effort = "xhigh"
+model_reasoning_summary = "detailed"
+
+# Web search
+web_search = "live"
+
+# Approval policy
+approval_policy = "on-request"
+
+# Feature toggles
+[features]
+skills = true
+
+# Skills configuration - enable project skills
+[[skills.config]]
+enabled = true
+path = ".opencode/skills/context-loader"
