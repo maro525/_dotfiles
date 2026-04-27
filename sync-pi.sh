@@ -20,10 +20,9 @@ cp -v "$SOURCE/AGENTS.md" "$SCRIPT_DIR/AGENTS.md"
 cp -v "$SOURCE/settings.json" "$DEST/settings.json"
 
 # Extensions
-#   atuin.ts        : single-file extension
 #   permissions/    : directory extension -> repo に flat な permissions.ts として保存
+#                     (Atuin history tracking is integrated into permissions.ts)
 mkdir -p "$DEST/extensions"
-cp -v "$SOURCE/extensions/atuin.ts"               "$DEST/extensions/atuin.ts"
 cp -v "$SOURCE/extensions/permissions/index.ts"   "$DEST/extensions/permissions.ts"
 
 # Workflow skills (allowlist — design スキルは除外)

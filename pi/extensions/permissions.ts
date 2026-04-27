@@ -1,18 +1,65 @@
 /**
  * Permissions extension for pi.
  *
- * Replicates Claude Code's allow/deny/ask permission model for bash commands.
+ * Replicates Claude Code's allow/deny/ask permission model for bash commands,
+ * and records approved commands in Atuin history with author `pi`.
  *
  * Install: symlink or copy to ~/.pi/agent/extensions/permissions/
  *
  *   mkdir -p ~/.pi/agent/extensions/permissions
  *   ln -sf /path/to/permissions.ts ~/.pi/agent/extensions/permissions/index.ts
  *
+ * For Atuin tracking, also run once:
+ *   atuin hook install pi
+ *
  * Then restart pi or run /reload.
  */
 
-import type { BashOperations, ExtensionAPI, Tool } from "@mariozechner/pi-coding-agent";
+import type { BashOperations, ExtensionAPI } from "@mariozechner/pi-coding-agent";
 import { createBashTool, createLocalBashOperations } from "@mariozechner/pi-coding-agent";
+
+// ─── Atuin History Tracking ──────────────────────────────────────────────────
+
+const ATUIN_AUTHOR = "pi";
+const ATUIN_TIMEOUT_MS = 10_000;
+
+async function startHistory(
+  pi: ExtensionAPI,
+  cwd: string,
+  command: string,
+): Promise<string | undefined> {
+  try {
+    const result = await pi.exec(
+      "atuin",
+      ["history", "start", "--author", ATUIN_AUTHOR, "--", command],
+      { cwd, timeout: ATUIN_TIMEOUT_MS },
+    );
+
+    if (result.code !== 0) return undefined;
+
+    const id = result.stdout.trim();
+    return id.length > 0 ? id : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+async function endHistory(
+  pi: ExtensionAPI,
+  cwd: string,
+  historyId: string,
+  exitCode: number,
+): Promise<void> {
+  try {
+    await pi.exec(
+      "atuin",
+      ["history", "end", historyId, "--exit", String(exitCode)],
+      { cwd, timeout: ATUIN_TIMEOUT_MS },
+    );
+  } catch {
+    // Ignore Atuin failures so command execution is never blocked.
+  }
+}
 
 // ─── Pattern Lists (port of claude/settings.json permissions) ────────────────
 
@@ -219,21 +266,34 @@ export default function permissionsExtension(pi: ExtensionAPI) {
         return { exitCode: 1, stdout: "", stderr: msg };
       }
 
-      if (level === "ask") {
-        const confirmCmd = confirmationScript(command);
-        const result = await local.exec(confirmCmd, commandCwd, options);
+      const effectiveCommand =
+        level === "ask" ? confirmationScript(command) : command;
 
-        if (result.exitCode === 0) {
-          approvedCount++;
+      // Record the original command in Atuin (not the wrapper).
+      const historyId = await startHistory(pi, commandCwd, command);
+      let exitCode: number | null = null;
+
+      try {
+        const result = await local.exec(effectiveCommand, commandCwd, options);
+        exitCode = result.exitCode;
+
+        if (level === "ask") {
+          if (result.exitCode === 0) approvedCount++;
+          else blockedCount++;
         } else {
-          blockedCount++;
+          approvedCount++;
         }
         return result;
+      } finally {
+        if (historyId) {
+          await endHistory(
+            pi,
+            commandCwd,
+            historyId,
+            exitCode ?? (options.signal?.aborted ? 130 : 1),
+          );
+        }
       }
-
-      // "allow" — execute directly
-      approvedCount++;
-      return local.exec(command, commandCwd, options);
     },
   };
 
