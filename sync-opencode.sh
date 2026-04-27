@@ -8,7 +8,8 @@ SOURCE="$HOME/.config/opencode"
 DEST="$SCRIPT_DIR/opencode"
 
 # top-level files
-cp -v "$SOURCE/AGENTS.md"       "$DEST/AGENTS.md"
+# AGENTS.md is unified at repo root and shared across CLIs (Claude / OpenCode / pi).
+cp -v "$SOURCE/AGENTS.md"       "$SCRIPT_DIR/AGENTS.md"
 cp -v "$SOURCE/opencode.jsonc"  "$DEST/opencode.jsonc"
 cp -v "$SOURCE/config.toml"     "$DEST/config.toml"
 

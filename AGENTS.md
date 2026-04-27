@@ -1,4 +1,21 @@
-# pi Global Instructions
+# Global Agent Instructions
+
+Claude Code + OpenCode CLI + pi CLI + Gemini CLI で並列開発を加速するための、共通エージェント仕様。
+
+このファイルは Claude Code / OpenCode / pi の各 CLI から共通で参照される単一の SSoT。
+ツール固有の差分は末尾の「ツール固有」セクションに集約する。
+
+## DOCUMENTATION STRUCTURE
+
+| Path | Purpose |
+|------|---------|
+| `.claude/commands/` / `.opencode/commands/` / `pi/commands/` | orchestrate / startproject / team-implement / team-review / deploy |
+| `.claude/agents/` / `.opencode/agents/` / `pi/agents/` | 各フェーズ用 subagent 定義 |
+| `.claude/docs/decisions/task-{LINEAR_ID}-{feature}.md` | 統合タスクファイル (SSoT) |
+| `.claude/docs/libraries/` | ライブラリ制約 |
+| `.claude/logs/` | CLI 入出力ログ |
+
+`.claude/docs/` ツリーは全 CLI で共有する（同じタスクファイルを参照）。
 
 ## WORKFLOW COMMON RULES
 
@@ -21,15 +38,29 @@
 
 **Hard Triggers（自動 L）:** 認証・DB migration・支払い・公開API変更・新規コア依存追加。
 
-## ROUTING NOTES
+## ROUTING NOTES (共通)
+
+- Git / Linear MCP は各フェーズ内で直接実行（Claude Code 版の `context: fork` 相当）
+- 外部リサーチは Gemini CLI（`gemini -p "..." 2>/dev/null`）
+- 設計相談は OpenCode CLI 自身が対応するか、並列セッションを起動
+
+---
+
+## ツール固有
+
+### OpenCode 固有
+
+- `.opencode/` 配下に commands / agents / skills を配置
+- 設計相談は OpenCode CLI 自身、または並列セッションを起動
+
+### pi 固有
 
 - Git 操作: `bash` ツールで直接実行
-- Linear 連携: MCP または gh CLI で代替
-- 外部リサーチ: Gemini CLI（`gemini -p "..." 2>/dev/null`）
+- Linear 連携: MCP または `gh` CLI で代替
 - 設計相談: OpenCode CLI（`opencode run -m github-copilot/gpt-5.4 "..."`）またはサブエージェント
 - サブエージェント起動: pi の `subagent` ツールを使用
 
-## DONT-ASK MODE
+#### DONT-ASK MODE
 
 環境変数 `PI_DONT_ASK_MODE=1` が設定されている場合:
 
