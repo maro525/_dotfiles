@@ -2,7 +2,7 @@
 # This file enables project-specific OpenCode settings
 
 # Default model configuration
-model = "github-copilot/gpt-5.4"
+model = "github-copilot/gpt-5.5"
 model_reasoning_effort = "xhigh"
 model_reasoning_summary = "detailed"
 

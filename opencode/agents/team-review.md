@@ -62,7 +62,7 @@ $ARGUMENTS: "{task description} --tier={S|M|L} --task-file={TASK_FILE} --linear-
 観点: バグ・エッジケース・エラーハンドリング。別 OpenCode セッションで:
 
 ```bash
-opencode run -m github-copilot/gpt-5.4 "以下のコード変更を Logic 観点でレビュー: {変更ファイル内容}" 2>/dev/null
+opencode run -m github-copilot/gpt-5.5 "以下のコード変更を Logic 観点でレビュー: {変更ファイル内容}" 2>/dev/null
 ```
 
 ### Security Reviewer
