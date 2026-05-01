@@ -10,7 +10,6 @@ DEST="$SCRIPT_DIR/opencode"
 # shellcheck source=lib/sync-common.sh
 source "$SCRIPT_DIR/lib/sync-common.sh"
 
-sync_common::init
 sync_common::parse_args "$(basename "$0")" "Sync ~/.config/opencode dotfiles to this repository." "$@"
 sync_common::show_header "$(basename "$0")"
 
