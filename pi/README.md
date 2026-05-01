@@ -36,8 +36,7 @@ pi/
 ├── prompts/
 │   └── orchestrate.md             # ✅ ワークフローpromptテンプレート
 ├── extensions/
-│   ├── atuin.ts                   # ✅ Bash履歴追跡
-│   └── permissions.ts             # ✅ パーミッションチェック
+│   └── permissions.ts             # ✅ パーミッション + Atuin履歴統合
 └── README.md                      # ✅ 本ファイル
 ```
 
@@ -78,13 +77,14 @@ curl -s -X POST "https://api.linear.app/graphql" \
   -d '{"query": "{ issues { nodes { id title identifier } } }"}'
 ```
 
-### 3. Git フック(Atuin 連携)
+### 3. Atuin 連携
 
 **現状:** Claude Code の hooks で `atuin hook claude-code` を実行。
 
-**pi での代替:** 既に `~/.pi/agent/extensions/atuin.ts` が存在。
+**pi での代替:** `permissions.ts` 内に Atuin 履歴追跡を統合済み。
 
-✅ **既に実装済み** - 追加設定不要。
+> `atuin.ts` は削除済み（2026-05-01）。
+> `atuin hook install pi` で配置されるテンプレートは使用しない。
 
 ### 4. agent-router.py 相当
 
@@ -210,4 +210,4 @@ DONT-ASK MODE では:
 - Claude Code 設定: `claude/settings.json`, `claude/CLAUDE.md`, `claude/commands/*.md`
 - 共通グローバル指示: `AGENTS.md`（repo root）
 - OpenCode 設定: `opencode/opencode.jsonc`, `opencode/agents/*.md`, `opencode/commands/*.md`, `opencode/config.toml`
-- pi 設定: `~/.pi/agent/settings.json`, `pi/skills/*/SKILL.md`, `pi/agents/*.md`, `pi/extensions/permissions.ts`, `~/.pi/agent/extensions/atuin.ts`
+- pi 設定: `~/.pi/agent/settings.json`, `pi/skills/*/SKILL.md`, `pi/agents/*.md`, `pi/extensions/permissions.ts`
