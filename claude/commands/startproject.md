@@ -64,7 +64,7 @@ $ARGUMENTS の形式: "{task description} --tier={S|M|L} --task-file={TASK_FILE}
 OpenCode サブエージェントに設計相談:
 
 ```bash
-opencode run -m github-copilot/gpt-5.4 "{question}" 2>/dev/null
+opencode run -m github-copilot/gpt-5.5 "{question}" 2>/dev/null
 ```
 
 - subagent_type: general-purpose

@@ -64,7 +64,7 @@ $ARGUMENTS: "{task description} --tier={S|M|L} --task-file={TASK_FILE} --linear-
 別 OpenCode セッションで設計相談:
 
 ```bash
-opencode run -m github-copilot/gpt-5.4 "{設計相談内容}" 2>/dev/null
+opencode run -m github-copilot/gpt-5.5 "{設計相談内容}" 2>/dev/null
 ```
 
 得られた設計方針を TASK_FILE の `Design` に書き込む。
