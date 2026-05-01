@@ -16,7 +16,6 @@ DEST="$SCRIPT_DIR/pi"
 # shellcheck source=lib/sync-common.sh
 source "$SCRIPT_DIR/lib/sync-common.sh"
 
-sync_common::init
 sync_common::parse_args "$(basename "$0")" "Sync ~/.pi/agent/ dotfiles to this repository." "$@"
 sync_common::show_header "$(basename "$0")"
 
