@@ -59,7 +59,7 @@ $ARGUMENTS の形式: "{task description} --tier={S|M|L} --task-file={TASK_FILE}
 
 ### OpenCode Reviewer
 ```bash
-opencode run -m github-copilot/gpt-5.4 "以下のコード変更をレビューしてください。Quality / Logic の観点で問題点と改善提案を列挙してください。\n\n{変更ファイルの内容}" 2>/dev/null
+opencode run -m github-copilot/gpt-5.5 "以下のコード変更をレビューしてください。Quality / Logic の観点で問題点と改善提案を列挙してください。\n\n{変更ファイルの内容}" 2>/dev/null
 ```
 
 観点:
