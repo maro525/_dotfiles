@@ -2,21 +2,19 @@
 # Shared sync helpers for sync-pi.sh / sync-claude.sh / sync-opencode.sh.
 #
 # Provides:
-#   - Interactive diff + a/k/s/e/q prompt for syncing HOME -> repo snapshots
-#   - Optional non-interactive (auto-copy) mode via -n / --non-interactive
+#   - Interactive diff + a/p/s/d/q prompt for syncing HOME <-> repo
+#   - Optional non-interactive (auto-copy HOME -> repo) mode via -n
 #   - File / directory / rsync-based sync helpers
 #
 # Source this file from each sync script:
 #   source "$SCRIPT_DIR/lib/sync-common.sh"
-#   sync_common::init
 #   sync_common::parse_args "$(basename "$0")" "Sync ... description ..." "$@"
 #   sync_common::show_header "$(basename "$0")"
 #
 # Public globals (set by helpers, read by callers):
 #   INTERACTIVE     1 = interactive (default), 0 = non-interactive
-#   PROMPT_ACTION   last interactive_prompt result (a/k/s/e/q)
+#   PROMPT_ACTION   last interactive_prompt result (a/p/s/d/q)
 #   DIFF_RESULT     last show_diff result (0=same, 1=different, 2=error)
-#   TMP_FILES       array of temp files cleaned up on exit
 
 # Guard against double-sourcing.
 if [[ "${SYNC_COMMON_SOURCED:-0}" == "1" ]]; then
@@ -28,22 +26,6 @@ SYNC_COMMON_SOURCED=1
 INTERACTIVE=1
 PROMPT_ACTION=""
 DIFF_RESULT=0
-TMP_FILES=()
-
-# Initialize trap to clean up temp files on EXIT/INT/TERM.
-sync_common::init() {
-  trap sync_common::_cleanup_tmp EXIT INT TERM
-}
-
-sync_common::_cleanup_tmp() {
-  local f
-  for f in "${TMP_FILES[@]:-}"; do
-    if [[ -n "$f" && -f "$f" ]]; then
-      rm -f "$f"
-    fi
-  done
-  return 0
-}
 
 # Print usage and exit. Args: script_name, description.
 sync_common::usage() {
@@ -139,7 +121,7 @@ sync_common::show_diff() {
 
 # Interactive prompt for sync decision.
 # Args: rel_path (label shown to user).
-# Sets: PROMPT_ACTION (a=accept, k=keep, s=show, e=edit, q=quit).
+# Sets: PROMPT_ACTION (a=accept HOME→repo, p=push repo→HOME, s=skip, d=diff, q=quit).
 sync_common::interactive_prompt() {
   local rel_path="$1"
 
@@ -149,94 +131,45 @@ sync_common::interactive_prompt() {
     echo ""
     echo "File: $rel_path"
     echo "Actions:"
-    echo "  (a)ccept HOME  - Copy HOME version to repo"
-    echo "  (k)eep repo    - Keep current repo version, skip this file"
-    echo "  (s)how diff    - Show diff again"
-    echo "  (e)dit         - Open editor for manual merge"
-    echo "  (q)uit         - Stop sync process"
+    echo "  (a)ccept HOME   - Copy HOME → repo"
+    echo "  (p)ush to HOME  - Copy repo → HOME"
+    echo "  (s)kip          - Skip this file"
+    echo "  (d)iff          - Show diff again"
+    echo "  (q)uit          - Stop sync process"
     echo ""
-    read -rp "Choose action [a/k/s/e/q]: " choice
+    read -rp "Choose action [a/p/s/d/q]: " choice
 
     case "$choice" in
       a|A)
-        echo "  → Accepting HOME version"
+        echo "  → Accepting HOME version (HOME → repo)"
         PROMPT_ACTION="a"
         ;;
-      k|K)
-        echo "  → Keeping repo version"
-        PROMPT_ACTION="k"
+      p|P)
+        echo "  → Pushing repo version to HOME (repo → HOME)"
+        PROMPT_ACTION="p"
         ;;
       s|S)
-        echo "  → Showing diff again"
+        echo "  → Skipping"
         PROMPT_ACTION="s"
         ;;
-      e|E)
-        echo "  → Opening editor for manual merge"
-        PROMPT_ACTION="e"
+      d|D)
+        echo "  → Showing diff again"
+        PROMPT_ACTION="d"
         ;;
       q|Q)
         echo "  → Quitting sync"
         PROMPT_ACTION="q"
         ;;
       *)
-        echo "  Invalid choice. Please enter a, k, s, e, or q."
+        echo "  Invalid choice. Please enter a, p, s, d, or q."
         ;;
     esac
   done
 }
 
-# Manual merge: when both files exist and the editor is vim/nvim, use diff mode
-# (true 3-way feel — user edits the repo side directly while seeing HOME on the
-# right). Otherwise, fall back to editing a tmp copy of HOME and saving it to
-# the repo if the user made changes.
-# Args: src, dst.
-sync_common::manual_merge() {
-  local src="$1"
-  local dst="$2"
-
-  local editor="${VISUAL:-${EDITOR:-vim}}"
-  local editor_basename
-  editor_basename="$(basename "$editor")"
-
-  if [[ -f "$dst" ]] && [[ "$editor_basename" =~ ^(vim|nvim)$ ]]; then
-    echo "Opening $editor in diff mode"
-    echo "  Left:  $dst (repo — edit this side)"
-    echo "  Right: $src (home — reference)"
-    echo ""
-    "$editor" -d "$dst" "$src"
-    echo "  → Saved repo version"
-    return 0
-  fi
-
-  local tmp_file
-  tmp_file=$(mktemp)
-  TMP_FILES+=("$tmp_file")
-
-  cp "$src" "$tmp_file"
-
-  echo "Opening editor: $editor"
-  echo "  Source (HOME):      $src"
-  echo "  Destination (repo): $dst"
-  echo "  Working copy:       $tmp_file"
-  echo ""
-
-  "$editor" "$tmp_file"
-
-  # Save when dst doesn't exist yet, or when the user made edits
-  if [[ ! -f "$dst" ]] || ! cmp -s "$tmp_file" "$src"; then
-    echo "  → Saving edited version to repo"
-    mkdir -p "$(dirname "$dst")"
-    cp "$tmp_file" "$dst"
-  else
-    echo "  → No changes made, keeping repo version"
-  fi
-
-  rm -f "$tmp_file"
-}
-
-# Sync a single file (HOME -> repo).
+# Sync a single file (HOME <-> repo, direction chosen interactively).
 # Args: src, dst, [rel_path].
-# Returns 0 on accept/keep/edit, exits 130 on quit.
+# Returns 0 on accept/push/skip, exits 130 on quit.
 sync_common::sync_file() {
   local src="$1"
   local dst="$2"
@@ -265,25 +198,30 @@ sync_common::sync_file() {
           cp -v "$src" "$dst"
           return 0
           ;;
-        k)
+        p)
           if [[ $is_new -eq 1 ]]; then
-            echo "  → Skipping new file"
-          else
-            echo "  → Keeping repo version"
+            echo "  → Cannot push to HOME: repo version doesn't exist yet"
+            continue
           fi
+          mkdir -p "$(dirname "$src")"
+          cp -v "$dst" "$src"
           return 0
           ;;
         s)
+          if [[ $is_new -eq 1 ]]; then
+            echo "  → Skipping new file"
+          else
+            echo "  → Skipping (keeping repo version)"
+          fi
+          return 0
+          ;;
+        d)
           if [[ $is_new -eq 0 ]]; then
             sync_common::show_diff "$src" "$dst" || true
           else
             echo "  → New file in repo: $rel_path"
           fi
           continue
-          ;;
-        e)
-          sync_common::manual_merge "$src" "$dst"
-          return 0
           ;;
         q)
           echo "Sync interrupted by user"
@@ -323,8 +261,7 @@ sync_common::sync_directory() {
 
 # Sync a directory tree using rsync, with interactive dry-run preview.
 # Args: src_dir, dst_dir, [label (default: basename of dst_dir)].
-# Honors INTERACTIVE: shows rsync --dry-run output and prompts a/k/s/e/q.
-# 'e' opens manual_merge on src_dir/index.md or SKILL.md if present, then accepts.
+# Honors INTERACTIVE: shows rsync --dry-run output and prompts a/p/s/d/q.
 sync_common::sync_rsync_dir() {
   local src_dir="$1"
   local dst_dir="$2"
@@ -358,31 +295,20 @@ sync_common::sync_rsync_dir() {
             "$src_dir/" "$dst_dir/"
           done=1
           ;;
-        k)
-          echo "  → Skipping $label"
+        p)
+          # Reverse direction: repo → HOME.
+          rsync -av --delete \
+            --exclude='node_modules' \
+            --exclude='*.lock' \
+            "$dst_dir/" "$src_dir/"
           done=1
           ;;
         s)
-          # Loop and re-show the dry-run output.
-          ;;
-        e)
-          # Best-effort manual merge of the primary doc file in the directory.
-          local primary=""
-          if [[ -f "$src_dir/index.md" ]]; then
-            primary="index.md"
-          elif [[ -f "$src_dir/SKILL.md" ]]; then
-            primary="SKILL.md"
-          fi
-          if [[ -n "$primary" ]]; then
-            sync_common::manual_merge "$src_dir/$primary" "$dst_dir/$primary"
-          else
-            echo "  → No index.md/SKILL.md found; falling back to accept"
-            rsync -av --delete \
-              --exclude='node_modules' \
-              --exclude='*.lock' \
-              "$src_dir/" "$dst_dir/"
-          fi
+          echo "  → Skipping $label"
           done=1
+          ;;
+        d)
+          # Loop and re-show the dry-run output.
           ;;
         q)
           echo "Sync interrupted by user"
