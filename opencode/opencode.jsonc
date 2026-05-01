@@ -5,19 +5,106 @@
   "permission": {
     "edit": "ask",
     "bash": {
+      // Default: ask for anything not explicitly listed
       "*": "ask",
-      "git status": "allow",
-      "git branch *": "allow",
-      "git diff *": "allow",
-      "git log *": "allow",
-      "git show *": "allow",
-      "git blame *": "allow",
-      "ls *": "allow",
-      "cat *": "allow",
-      "rg *": "allow",
-      "grep *": "allow",
+
+      // DENY
+      "sudo *": "deny",
+      "rm -rf *": "deny",
       "git push --force*": "deny",
-      "rm -rf *": "deny"
+      "git reset": "deny",
+      "git reset *": "deny",
+      "chmod *": "deny",
+
+      // ASK (explicit confirmation)
+      "git rebase *": "ask",
+      "rm *": "ask",
+      "mkfs *": "ask",
+      "fdisk *": "ask",
+      "dd *": "ask",
+
+      // ALLOW: info / version
+      "* --version": "allow",
+      "pwd": "allow",
+      "whoami": "allow",
+      "which *": "allow",
+      "uname *": "allow",
+
+      // ALLOW: file operations
+      "cat *": "allow",
+      "cp *": "allow",
+      "echo *": "allow",
+      "find *": "allow",
+      "ls *": "allow",
+      "tree *": "allow",
+      "wc *": "allow",
+      "xxd *": "allow",
+      "file *": "allow",
+      "stat *": "allow",
+      "readlink *": "allow",
+      "realpath *": "allow",
+
+      // ALLOW: text processing / search
+      "grep *": "allow",
+      "rg *": "allow",
+      "head *": "allow",
+      "tail *": "allow",
+      "sed *": "allow",
+      "awk *": "allow",
+
+      // ALLOW: git (reset / force handled above)
+      "git *": "allow",
+
+      // ALLOW: node / npm / pnpm
+      "npm install *": "allow",
+      "npm run *": "allow",
+      "npm test *": "allow",
+      "npx eslint *": "allow",
+      "npx prettier *": "allow",
+      "npx tsc *": "allow",
+      "pnpm add *": "allow",
+      "pnpm install *": "allow",
+      "pnpm exec eslint *": "allow",
+      "pnpm exec prettier *": "allow",
+      "pnpm exec tsc *": "allow",
+      "pnpm run *": "allow",
+      "pnpm test *": "allow",
+
+      // ALLOW: python / uv
+      "uv install *": "allow",
+      "uv run *": "allow",
+      "uv sync *": "allow",
+      "python *": "allow",
+      "python3 *": "allow",
+      "pip *": "allow",
+
+      // ALLOW: github cli
+      "gh *": "allow",
+
+      // ALLOW: network
+      "curl*": "allow",
+      "wget *": "allow",
+
+      // ALLOW: shell control flow keywords
+      "do": "allow",
+      "done": "allow",
+      "else": "allow",
+      "fi": "allow",
+      "then": "allow",
+
+      // ALLOW: directory / move
+      "mkdir *": "allow",
+      "mv *": "allow",
+      "touch *": "allow",
+      "ln *": "allow",
+
+      // ALLOW: build / dev tools
+      "make *": "allow",
+      "cmake *": "allow",
+      "cargo *": "allow",
+      "yarn *": "allow",
+      "bun *": "allow",
+      "deno *": "allow"
     },
     "webfetch": "allow"
   },
