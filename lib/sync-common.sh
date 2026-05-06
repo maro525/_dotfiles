@@ -80,6 +80,60 @@ sync_common::show_header() {
   echo ""
 }
 
+# Print a diff between two files inside a visual box.
+# Args: src, dst, [max_lines (default: 40)].
+sync_common::print_diff_box() {
+  local src="$1"
+  local dst="$2"
+  local max_lines="${3:-40}"
+
+  local src_label="HOME"
+  local dst_label="repo"
+
+  # Dynamic terminal width (default 62 if tput unavailable)
+  local width
+  width=$(tput cols 2>/dev/null || echo 80)
+  if [[ $width -gt 62 ]]; then
+    width=62
+  elif [[ $width -lt 40 ]]; then
+    width=40
+  fi
+
+  # Build dash line efficiently — no seq, no multibyte issues
+  local dashes
+  printf -v dashes '%*s' $((width - 2)) ''
+  dashes=${dashes// /─}
+
+  echo ""
+  echo "┌${dashes}┐"
+  echo "│ Diff: $dst_label → $src_label"
+  echo "├${dashes}┤"
+
+  local diff_output
+  if command -v colordiff &>/dev/null; then
+    diff_output=$(diff -u "$dst" "$src" 2>/dev/null | colordiff) || true
+  else
+    diff_output=$(diff -u "$dst" "$src" 2>/dev/null) || true
+  fi
+
+  # P2: defensive check for empty diff_output
+  if [[ -n "$diff_output" ]]; then
+    local count=0
+    while IFS= read -r line; do
+      if [[ $count -ge $max_lines ]]; then
+        echo "│   ... (truncated at $max_lines lines)"
+        break
+      fi
+      echo "│ $line"
+      count=$((count + 1))
+    done <<< "$diff_output"
+  else
+    echo "│ (no differences)"
+  fi
+
+  echo "└${dashes}┘"
+}
+
 # Show diff between two files.
 # Args: src, dst.
 # Sets: DIFF_RESULT (0=same, 1=different, 2=error).
@@ -102,17 +156,8 @@ sync_common::show_diff() {
   fi
 
   if cmp -s "$src" "$dst"; then
-    echo "  Files are identical"
     DIFF_RESULT=0
     return 0
-  fi
-
-  echo "--- $dst (repo)"
-  echo "+++ $src (home)"
-  if command -v colordiff &>/dev/null; then
-    diff -u "$dst" "$src" | colordiff || true
-  else
-    diff -u "$dst" "$src" || true
   fi
 
   DIFF_RESULT=1
@@ -120,36 +165,52 @@ sync_common::show_diff() {
 }
 
 # Interactive prompt for sync decision.
-# Args: rel_path (label shown to user).
+# Args: rel_path, [src], [dst].
 # Sets: PROMPT_ACTION (a=accept HOME→repo, p=push repo→HOME, s=skip, d=diff, q=quit).
 sync_common::interactive_prompt() {
   local rel_path="$1"
+  local src="${2:-}"
+  local dst="${3:-}"
 
   PROMPT_ACTION=""
 
   while [[ -z "$PROMPT_ACTION" ]]; do
     echo ""
     echo "File: $rel_path"
+
+    # Show diff with border if both files exist and differ
+    if [[ -n "$src" && -n "$dst" && -f "$src" && -f "$dst" ]]; then
+      if ! cmp -s "$src" "$dst"; then
+        sync_common::print_diff_box "$src" "$dst"
+      else
+        echo "  (identical — no changes to sync)"
+      fi
+    fi
+
+    echo ""
     echo "Actions:"
     echo "  (a)ccept HOME   - Copy HOME → repo"
     echo "  (p)ush to HOME  - Copy repo → HOME"
-    echo "  (s)kip          - Skip this file"
+    echo "  (s)kip          - Keep both versions unchanged"
     echo "  (d)iff          - Show diff again"
     echo "  (q)uit          - Stop sync process"
     echo ""
-    read -rp "Choose action [a/p/s/d/q]: " choice
+    read -rp "Choose action [a/p/s/d/q]: " choice < /dev/tty || choice=""
+
+    # Trim leading/trailing whitespace
+    choice="$(echo "$choice" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
 
     case "$choice" in
       a|A)
-        echo "  → Accepting HOME version (HOME → repo)"
+        echo "  → Accepted: a (copy HOME → repo)"
         PROMPT_ACTION="a"
         ;;
       p|P)
-        echo "  → Pushing repo version to HOME (repo → HOME)"
+        echo "  → Accepted: p (copy repo → HOME)"
         PROMPT_ACTION="p"
         ;;
       s|S)
-        echo "  → Skipping"
+        echo "  → Accepted: s (skip)"
         PROMPT_ACTION="s"
         ;;
       d|D)
@@ -157,7 +218,11 @@ sync_common::interactive_prompt() {
         PROMPT_ACTION="d"
         ;;
       q|Q)
-        echo "  → Quitting sync"
+        echo "  → Accepted: q (quit)"
+        PROMPT_ACTION="q"
+        ;;
+      "")
+        echo "  → No input available. Quitting sync."
         PROMPT_ACTION="q"
         ;;
       *)
@@ -190,7 +255,7 @@ sync_common::sync_file() {
     fi
 
     while true; do
-      sync_common::interactive_prompt "$rel_path"
+      sync_common::interactive_prompt "$rel_path" "$src" "$dst"
 
       case "$PROMPT_ACTION" in
         a)
@@ -209,15 +274,16 @@ sync_common::sync_file() {
           ;;
         s)
           if [[ $is_new -eq 1 ]]; then
-            echo "  → Skipping new file"
+            echo "  → Skipping — new file left as-is in repo"
           else
-            echo "  → Skipping (keeping repo version)"
+            echo "  → Skipping — keeping both HOME and repo versions unchanged"
           fi
           return 0
           ;;
         d)
+          # Re-show the diff in the box format
           if [[ $is_new -eq 0 ]]; then
-            sync_common::show_diff "$src" "$dst" || true
+            sync_common::print_diff_box "$src" "$dst"
           else
             echo "  → New file in repo: $rel_path"
           fi
