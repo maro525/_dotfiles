@@ -11,7 +11,6 @@ permission:
     "git diff *": allow
     "rg *": allow
     "gemini *": allow
-    "opencode run *": allow
 ---
 
 # startproject
@@ -53,19 +52,21 @@ $ARGUMENTS: "{task description} --tier={S|M|L} --task-file={TASK_FILE} --linear-
 
 ## PHASE 2: RESEARCH & DESIGN
 
-**$ARGUMENTS に「opencodeに相談」等のキーワード → tier に関わらず OpenCode 並列相談。**
+**$ARGUMENTS に「設計相談」「セカンドオピニオン」等のキーワード → tier に関わらず subagent で並列設計相談。**
 
 成果物はすべて TASK_FILE の `Design` に書き込む（外部ファイル不作成）。
+
+設計相談は `task` tool で subagent を起動する（同モデル・別コンテキストで独立性を確保）。
+モデル多様性が必要な外部リサーチは Gemini CLI を使う。
 
 ### tier=S
 スキップ → Phase 3。
 
 ### tier=M
-別 OpenCode セッションで設計相談:
+`task` tool で subagent を起動して設計相談:
 
-```bash
-opencode run -m github-copilot/gpt-5.5 "{設計相談内容}" 2>/dev/null
-```
+- prompt: "{設計相談内容}"
+- 期待: 設計方針案を返す
 
 得られた設計方針を TASK_FILE の `Design` に書き込む。
 
@@ -74,8 +75,8 @@ Researcher と Architect を **並列起動**。
 
 | ロール | ツール | 役割 |
 |-------|-------|------|
-| Researcher | Gemini CLI | 外部ライブラリ・事例を調査 |
-| Architect  | OpenCode 別セッション | 設計方針を策定 |
+| Researcher | Gemini CLI | 外部ライブラリ・事例を調査（モデル多様性が活きる役割） |
+| Architect  | `task` tool（subagent） | 設計方針を策定 |
 
 両者の成果を Lead がメモリ内で統合し、TASK_FILE の `Design` に書き込む。
 
