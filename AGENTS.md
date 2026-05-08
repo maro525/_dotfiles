@@ -46,7 +46,7 @@ pi CLI 用の追加指示は `pi/AGENTS.pi.md` にあり、デプロイ時に本
 
 - Git / Linear MCP は各フェーズ内で直接実行
 - 外部リサーチは Gemini CLI（`gemini -p "..." 2>/dev/null`）
-- 設計相談は OpenCode CLI 自身、または別セッションを並列起動
+- 設計相談は実行中エージェント自身で対応するか、`task` tool（subagent）で並列起動
 
 ---
 
@@ -59,4 +59,4 @@ pi CLI 用の追加指示は `pi/AGENTS.pi.md` にあり、デプロイ時に本
 - **スキル間連鎖**: `@agent-name` mention で起動。コマンド同士の直接呼び出しは不可
 - **サブエージェント起動**: `task` tool を使用
 - **`context: fork` 代替**: `mode: subagent` + `subtask: true`（親子間のトークン共有挙動は若干異なる）
-- 設計相談: OpenCode CLI 自身で対応するか、`opencode run -m github-copilot/gpt-5.5 "..."` で並列セッションを起動
+- 設計相談: OpenCode 自身で対応するか、`task` tool（subagent）で並列起動。モデル多様性が必要な場合は Gemini CLI を併用
