@@ -80,6 +80,94 @@ sync_common::show_header() {
   echo ""
 }
 
+# Print a diff between two files inside a visual box.
+# Args: src, dst, [max_lines (default: 40)].
+sync_common::print_diff_box() {
+  local src="$1"
+  local dst="$2"
+  local max_lines="${3:-40}"
+
+  local src_label="HOME"
+  local dst_label="repo"
+
+  # Dynamic terminal width (default 62 if tput unavailable)
+  local width
+  width=$(tput cols 2>/dev/null || echo 80)
+  if [[ $width -gt 62 ]]; then
+    width=62
+  elif [[ $width -lt 40 ]]; then
+    width=40
+  fi
+
+  # Build dash line efficiently — no seq, no multibyte issues
+  local dashes
+  printf -v dashes '%*s' $((width - 2)) ''
+  dashes=${dashes// /─}
+
+  # Use /dev/null as the dst when the repo file doesn't exist yet — diff -u
+  # will emit the full source as a single +block, which is the correct preview
+  # for a "new file" sync.
+  local dst_for_diff="$dst"
+  local title="Diff: $dst_label → $src_label"
+  if [[ ! -f "$dst" ]]; then
+    dst_for_diff=/dev/null
+    title="New file content (from $src_label)"
+  fi
+
+  echo ""
+  echo "┌${dashes}┐"
+  echo "│ $title"
+  echo "├${dashes}┤"
+
+  local diff_output
+  if command -v colordiff &>/dev/null; then
+    diff_output=$(diff -u "$dst_for_diff" "$src" 2>/dev/null | colordiff) || true
+  else
+    diff_output=$(diff -u "$dst_for_diff" "$src" 2>/dev/null) || true
+  fi
+
+  # P2: defensive check for empty diff_output
+  if [[ -n "$diff_output" ]]; then
+    local count=0
+    while IFS= read -r line; do
+      if [[ $count -ge $max_lines ]]; then
+        echo "│   ... (truncated at $max_lines lines)"
+        break
+      fi
+      echo "│ $line"
+      count=$((count + 1))
+    done <<< "$diff_output"
+  else
+    echo "│ (no differences)"
+  fi
+
+  echo "└${dashes}┘"
+}
+
+# Print a prominent header line for the file currently being prompted.
+# Bold filename between two ═ separator lines, sized to terminal width.
+# Args: rel_path.
+sync_common::print_file_header() {
+  local rel_path="$1"
+
+  local width
+  width=$(tput cols 2>/dev/null || echo 80)
+  if [[ $width -gt 62 ]]; then
+    width=62
+  elif [[ $width -lt 40 ]]; then
+    width=40
+  fi
+
+  local equals
+  printf -v equals '%*s' "$width" ''
+  equals=${equals// /═}
+
+  echo ""
+  echo "$equals"
+  printf '  \e[1mFile: %s\e[0m\n' "$rel_path"
+  echo "$equals"
+}
+
 # Show diff between two files.
 # Args: src, dst.
 # Sets: DIFF_RESULT (0=same, 1=different, 2=error).
@@ -102,17 +190,8 @@ sync_common::show_diff() {
   fi
 
   if cmp -s "$src" "$dst"; then
-    echo "  Files are identical"
     DIFF_RESULT=0
     return 0
-  fi
-
-  echo "--- $dst (repo)"
-  echo "+++ $src (home)"
-  if command -v colordiff &>/dev/null; then
-    diff -u "$dst" "$src" | colordiff || true
-  else
-    diff -u "$dst" "$src" || true
   fi
 
   DIFF_RESULT=1
@@ -120,36 +199,54 @@ sync_common::show_diff() {
 }
 
 # Interactive prompt for sync decision.
-# Args: rel_path (label shown to user).
+# Args: rel_path, [src], [dst].
 # Sets: PROMPT_ACTION (a=accept HOME→repo, p=push repo→HOME, s=skip, d=diff, q=quit).
 sync_common::interactive_prompt() {
   local rel_path="$1"
+  local src="${2:-}"
+  local dst="${3:-}"
 
   PROMPT_ACTION=""
 
   while [[ -z "$PROMPT_ACTION" ]]; do
+    sync_common::print_file_header "$rel_path"
+
+    # Show diff/preview box.
+    if [[ -n "$src" && -n "$dst" && -f "$src" ]]; then
+      if [[ ! -f "$dst" ]]; then
+        echo "  (new file — not yet in repo)"
+        sync_common::print_diff_box "$src" "$dst"
+      elif ! cmp -s "$src" "$dst"; then
+        sync_common::print_diff_box "$src" "$dst"
+      else
+        echo "  (identical — no changes to sync)"
+      fi
+    fi
+
     echo ""
-    echo "File: $rel_path"
     echo "Actions:"
     echo "  (a)ccept HOME   - Copy HOME → repo"
     echo "  (p)ush to HOME  - Copy repo → HOME"
-    echo "  (s)kip          - Skip this file"
+    echo "  (s)kip          - Keep both versions unchanged"
     echo "  (d)iff          - Show diff again"
     echo "  (q)uit          - Stop sync process"
     echo ""
-    read -rp "Choose action [a/p/s/d/q]: " choice
+    read -rp "Choose action [a/p/s/d/q]: " choice < /dev/tty || choice=""
+
+    # Trim leading/trailing whitespace
+    choice="$(echo "$choice" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
 
     case "$choice" in
       a|A)
-        echo "  → Accepting HOME version (HOME → repo)"
+        echo "  → Accepted: a (copy HOME → repo)"
         PROMPT_ACTION="a"
         ;;
       p|P)
-        echo "  → Pushing repo version to HOME (repo → HOME)"
+        echo "  → Accepted: p (copy repo → HOME)"
         PROMPT_ACTION="p"
         ;;
       s|S)
-        echo "  → Skipping"
+        echo "  → Accepted: s (skip)"
         PROMPT_ACTION="s"
         ;;
       d|D)
@@ -157,7 +254,11 @@ sync_common::interactive_prompt() {
         PROMPT_ACTION="d"
         ;;
       q|Q)
-        echo "  → Quitting sync"
+        echo "  → Accepted: q (quit)"
+        PROMPT_ACTION="q"
+        ;;
+      "")
+        echo "  → No input available. Quitting sync."
         PROMPT_ACTION="q"
         ;;
       *)
@@ -185,12 +286,11 @@ sync_common::sync_file() {
     if [[ -f "$dst" ]]; then
       sync_common::show_diff "$src" "$dst" || true
     else
-      echo "  → New file in repo: $rel_path"
       is_new=1
     fi
 
     while true; do
-      sync_common::interactive_prompt "$rel_path"
+      sync_common::interactive_prompt "$rel_path" "$src" "$dst"
 
       case "$PROMPT_ACTION" in
         a)
@@ -209,18 +309,14 @@ sync_common::sync_file() {
           ;;
         s)
           if [[ $is_new -eq 1 ]]; then
-            echo "  → Skipping new file"
+            echo "  → Skipping — new file left as-is in repo"
           else
-            echo "  → Skipping (keeping repo version)"
+            echo "  → Skipping — keeping both HOME and repo versions unchanged"
           fi
           return 0
           ;;
         d)
-          if [[ $is_new -eq 0 ]]; then
-            sync_common::show_diff "$src" "$dst" || true
-          else
-            echo "  → New file in repo: $rel_path"
-          fi
+          # interactive_prompt's next iteration re-renders the header and box.
           continue
           ;;
         q)
@@ -237,8 +333,10 @@ sync_common::sync_file() {
   return 0
 }
 
-# Sync files matching a glob pattern in a single directory (non-recursive).
+# Sync files matching a glob pattern in a directory tree (recursive).
 # Args: src_dir, dst_dir, [pattern (default: *.md)].
+# Each matching file is prompted individually via sync_file.
+# Excludes: node_modules/ trees and *.lock files.
 sync_common::sync_directory() {
   local src_dir="$1"
   local dst_dir="$2"
@@ -256,70 +354,8 @@ sync_common::sync_directory() {
     local rel_path="${src_file#$src_dir/}"
     local dst_file="$dst_dir/$rel_path"
     sync_common::sync_file "$src_file" "$dst_file" "$rel_path" || true
-  done < <(find "$src_dir" -maxdepth 1 -name "$pattern" -type f -print0 2>/dev/null)
-}
-
-# Sync a directory tree using rsync, with interactive dry-run preview.
-# Args: src_dir, dst_dir, [label (default: basename of dst_dir)].
-# Honors INTERACTIVE: shows rsync --dry-run output and prompts a/p/s/d/q.
-sync_common::sync_rsync_dir() {
-  local src_dir="$1"
-  local dst_dir="$2"
-  local label="${3:-$(basename "$dst_dir")}"
-
-  if [[ ! -d "$src_dir" ]]; then
-    echo "Warning: $src_dir not found in HOME — run the sync script after deploying first." >&2
-    return 1
-  fi
-
-  mkdir -p "$dst_dir"
-
-  if [[ $INTERACTIVE -eq 1 ]]; then
-    echo ""
-    echo "=== Directory: $label ==="
-
-    local done=0
-    while [[ $done -eq 0 ]]; do
-      rsync -av --dry-run --delete \
-        --exclude='node_modules' \
-        --exclude='*.lock' \
-        "$src_dir/" "$dst_dir/" || true
-
-      sync_common::interactive_prompt "$label"
-
-      case "$PROMPT_ACTION" in
-        a)
-          rsync -av --delete \
-            --exclude='node_modules' \
-            --exclude='*.lock' \
-            "$src_dir/" "$dst_dir/"
-          done=1
-          ;;
-        p)
-          # Reverse direction: repo → HOME.
-          rsync -av --delete \
-            --exclude='node_modules' \
-            --exclude='*.lock' \
-            "$dst_dir/" "$src_dir/"
-          done=1
-          ;;
-        s)
-          echo "  → Skipping $label"
-          done=1
-          ;;
-        d)
-          # Loop and re-show the dry-run output.
-          ;;
-        q)
-          echo "Sync interrupted by user"
-          exit 130
-          ;;
-      esac
-    done
-  else
-    rsync -av --delete \
-      --exclude='node_modules' \
-      --exclude='*.lock' \
-      "$src_dir/" "$dst_dir/"
-  fi
+  done < <(find "$src_dir" \
+    -name 'node_modules' -prune -o \
+    -type f -name "$pattern" ! -name '*.lock' -print0 \
+    2>/dev/null)
 }
