@@ -213,6 +213,6 @@ DONT-ASK MODE では:
 ## 参考ファイル
 
 - Claude Code 設定: `claude/settings.json`, `claude/CLAUDE.md`, `claude/commands/*.md`
-- 共通グローバル指示: `AGENTS.md`（repo root）
+- pi グローバル指示: `pi/AGENTS.md`（OpenCode の `opencode/AGENTS.md` とは独立）
 - OpenCode 設定: `opencode/opencode.jsonc`, `opencode/agents/*.md`, `opencode/commands/*.md`, `opencode/config.toml`
 - pi 設定: `~/.pi/agent/settings.json`, `pi/skills/*/SKILL.md`, `pi/agents/*.md`, `pi/extensions/permissions.ts`
