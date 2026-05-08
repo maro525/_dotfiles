@@ -13,11 +13,15 @@ source "$SCRIPT_DIR/lib/sync-common.sh"
 sync_common::parse_args "$(basename "$0")" "Sync ~/.claude dotfiles to this repository." "$@"
 sync_common::show_header "$(basename "$0")"
 
-# settings.json
+# Top-level config files
+sync_common::sync_file "$SOURCE/CLAUDE.md"     "$DEST/CLAUDE.md"     "CLAUDE.md" || true
 sync_common::sync_file "$SOURCE/settings.json" "$DEST/settings.json" "settings.json" || true
 
-# commands
-sync_common::sync_directory "$SOURCE/commands" "$DEST/commands" "*.md" || true
+# Subdirectories — sync every file (bidirectional discovery surfaces files
+# that exist only in repo or only in HOME).
+sync_common::sync_directory "$SOURCE/commands" "$DEST/commands" "*" || true
+sync_common::sync_directory "$SOURCE/hooks"    "$DEST/hooks"    "*" || true
+sync_common::sync_directory "$SOURCE/skills"   "$DEST/skills"   "*" || true
 
 echo ""
 echo "Done."
