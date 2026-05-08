@@ -1,0 +1,9 @@
+{
+  "packages": [
+    "npm:pi-subagents"
+  ],
+  "lastChangelogVersion": "0.71.1",
+  "defaultProvider": "fireworks",
+  "defaultModel": "accounts/fireworks/models/qwen3p6-plus",
+  "hideThinkingBlock": true
+}
