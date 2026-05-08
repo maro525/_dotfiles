@@ -19,8 +19,22 @@ source "$SCRIPT_DIR/lib/sync-common.sh"
 sync_common::parse_args "$(basename "$0")" "Sync ~/.pi/agent/ dotfiles to this repository." "$@"
 sync_common::show_header "$(basename "$0")"
 
-# Shared global instructions (root AGENTS.md, used by all CLIs).
-sync_common::sync_file "$SOURCE/AGENTS.md" "$SCRIPT_DIR/AGENTS.md" "AGENTS.md" || true
+# pi-specific section of AGENTS.md.
+# Shared portion (root AGENTS.md) is owned by sync-opencode.sh; here we only
+# extract the "## pi 固有" section onward from the deployed file and snapshot
+# it to pi/AGENTS.pi.md. Deploy is reverse: `cat AGENTS.md pi/AGENTS.pi.md > $SOURCE/AGENTS.md`.
+PI_SPECIFIC_TMP="$(mktemp)"
+trap 'rm -f "$PI_SPECIFIC_TMP"' EXIT
+if [[ -f "$SOURCE/AGENTS.md" ]]; then
+  awk '/^### pi 固有$/{flag=1} flag' "$SOURCE/AGENTS.md" > "$PI_SPECIFIC_TMP"
+  if [[ ! -s "$PI_SPECIFIC_TMP" ]]; then
+    echo "Warning: '### pi 固有' section not found in $SOURCE/AGENTS.md — skipping pi/AGENTS.pi.md sync." >&2
+  else
+    sync_common::sync_file "$PI_SPECIFIC_TMP" "$DEST/AGENTS.pi.md" "pi/AGENTS.pi.md" || true
+  fi
+else
+  echo "Warning: $SOURCE/AGENTS.md not found — skipping pi/AGENTS.pi.md sync." >&2
+fi
 
 # Top-level pi config
 sync_common::sync_file "$SOURCE/settings.json" "$DEST/settings.json" "settings.json" || true
