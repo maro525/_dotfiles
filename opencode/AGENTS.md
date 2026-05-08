@@ -1,6 +1,6 @@
 # OpenCode Agent Instructions
 
-Claude Code + OpenCode CLI + pi CLI + Gemini CLI で並列開発を加速するための、OpenCode 用エージェント仕様。
+OpenCode CLI で開発を加速するためのエージェント仕様（外部リサーチ用に Gemini CLI を補助的に併用）。
 
 ## DOCUMENTATION STRUCTURE
 

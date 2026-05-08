@@ -1,6 +1,6 @@
 # pi Agent Instructions
 
-Claude Code + OpenCode CLI + pi CLI + Gemini CLI で並列開発を加速するための、pi 用エージェント仕様。
+pi CLI + OpenCode CLI で並列開発を加速するためのエージェント仕様（外部リサーチ用に Gemini CLI を補助的に併用）。OpenCode は pi のデフォルトモデルと異なる gpt-5.5 を使うため、設計相談で異モデルセカンドオピニオンとして機能する。
 
 ## DOCUMENTATION STRUCTURE
 
