@@ -104,14 +104,19 @@ sync_common::print_diff_box() {
   printf -v dashes '%*s' $((width - 2)) ''
   dashes=${dashes// /─}
 
-  # Use /dev/null as the dst when the repo file doesn't exist yet — diff -u
-  # will emit the full source as a single +block, which is the correct preview
-  # for a "new file" sync.
-  local dst_for_diff="$dst"
+  # Use /dev/null on the missing side so diff -u emits the present file as a
+  # single +block — the right preview for "new file" syncs in either direction.
+  local left="$dst"
+  local right="$src"
   local title="Diff: $dst_label → $src_label"
-  if [[ ! -f "$dst" ]]; then
-    dst_for_diff=/dev/null
-    title="New file content (from $src_label)"
+  if [[ ! -f "$src" && -f "$dst" ]]; then
+    left=/dev/null
+    right="$dst"
+    title="New file content (from $dst_label — not yet in $src_label)"
+  elif [[ ! -f "$dst" && -f "$src" ]]; then
+    left=/dev/null
+    right="$src"
+    title="New file content (from $src_label — not yet in $dst_label)"
   fi
 
   echo ""
@@ -121,9 +126,9 @@ sync_common::print_diff_box() {
 
   local diff_output
   if command -v colordiff &>/dev/null; then
-    diff_output=$(diff -u "$dst_for_diff" "$src" 2>/dev/null | colordiff) || true
+    diff_output=$(diff -u "$left" "$right" 2>/dev/null | colordiff) || true
   else
-    diff_output=$(diff -u "$dst_for_diff" "$src" 2>/dev/null) || true
+    diff_output=$(diff -u "$left" "$right" 2>/dev/null) || true
   fi
 
   # P2: defensive check for empty diff_output
@@ -212,14 +217,19 @@ sync_common::interactive_prompt() {
     sync_common::print_file_header "$rel_path"
 
     # Show diff/preview box.
-    if [[ -n "$src" && -n "$dst" && -f "$src" ]]; then
-      if [[ ! -f "$dst" ]]; then
+    if [[ -n "$src" && -n "$dst" ]]; then
+      if [[ ! -f "$src" && -f "$dst" ]]; then
+        echo "  (only in repo — not yet in HOME)"
+        sync_common::print_diff_box "$src" "$dst"
+      elif [[ ! -f "$dst" && -f "$src" ]]; then
         echo "  (new file — not yet in repo)"
         sync_common::print_diff_box "$src" "$dst"
-      elif ! cmp -s "$src" "$dst"; then
-        sync_common::print_diff_box "$src" "$dst"
-      else
-        echo "  (identical — no changes to sync)"
+      elif [[ -f "$src" && -f "$dst" ]]; then
+        if ! cmp -s "$src" "$dst"; then
+          sync_common::print_diff_box "$src" "$dst"
+        else
+          echo "  (identical — no changes to sync)"
+        fi
       fi
     fi
 
@@ -276,17 +286,19 @@ sync_common::sync_file() {
   local dst="$2"
   local rel_path="${3:-$(basename "$src")}"
 
-  if [[ ! -f "$src" ]]; then
-    echo "Warning: $src not found in HOME — run the sync script after deploying first." >&2
-    return 1
+  if [[ ! -f "$src" && ! -f "$dst" ]]; then
+    return 0
   fi
 
   if [[ $INTERACTIVE -eq 1 ]]; then
-    local is_new=0
-    if [[ -f "$dst" ]]; then
-      sync_common::show_diff "$src" "$dst" || true
+    local only_in_home=0
+    local only_in_repo=0
+    if [[ ! -f "$dst" ]]; then
+      only_in_home=1
+    elif [[ ! -f "$src" ]]; then
+      only_in_repo=1
     else
-      is_new=1
+      sync_common::show_diff "$src" "$dst" || true
     fi
 
     while true; do
@@ -294,12 +306,16 @@ sync_common::sync_file() {
 
       case "$PROMPT_ACTION" in
         a)
+          if [[ $only_in_repo -eq 1 ]]; then
+            echo "  → Cannot copy HOME → repo: HOME version doesn't exist"
+            continue
+          fi
           mkdir -p "$(dirname "$dst")"
           cp -v "$src" "$dst"
           return 0
           ;;
         p)
-          if [[ $is_new -eq 1 ]]; then
+          if [[ $only_in_home -eq 1 ]]; then
             echo "  → Cannot push to HOME: repo version doesn't exist yet"
             continue
           fi
@@ -308,8 +324,10 @@ sync_common::sync_file() {
           return 0
           ;;
         s)
-          if [[ $is_new -eq 1 ]]; then
+          if [[ $only_in_home -eq 1 ]]; then
             echo "  → Skipping — new file left as-is in repo"
+          elif [[ $only_in_repo -eq 1 ]]; then
+            echo "  → Skipping — repo file not copied to HOME"
           else
             echo "  → Skipping — keeping both HOME and repo versions unchanged"
           fi
@@ -326,8 +344,10 @@ sync_common::sync_file() {
       esac
     done
   else
-    mkdir -p "$(dirname "$dst")"
-    cp -v "$src" "$dst"
+    if [[ -f "$src" ]]; then
+      mkdir -p "$(dirname "$dst")"
+      cp -v "$src" "$dst"
+    fi
   fi
 
   return 0
@@ -342,20 +362,39 @@ sync_common::sync_directory() {
   local dst_dir="$2"
   local pattern="${3:-*.md}"
 
-  if [[ ! -d "$src_dir" ]]; then
-    echo "Warning: $src_dir not found in HOME — run the sync script after deploying first." >&2
+  if [[ ! -d "$src_dir" && ! -d "$dst_dir" ]]; then
+    echo "Warning: neither $src_dir nor $dst_dir exists — run the sync script after deploying first." >&2
     return 1
   fi
 
   mkdir -p "$dst_dir"
 
-  # NUL-separated to handle filenames with spaces/newlines safely.
-  while IFS= read -r -d '' src_file; do
-    local rel_path="${src_file#$src_dir/}"
-    local dst_file="$dst_dir/$rel_path"
-    sync_common::sync_file "$src_file" "$dst_file" "$rel_path" || true
-  done < <(find "$src_dir" \
-    -name 'node_modules' -prune -o \
-    -type f -name "$pattern" ! -name '*.lock' -print0 \
-    2>/dev/null)
+  # Walk both sides and take the union of relative paths, so files that
+  # exist only in repo (or only in HOME) are both surfaced for sync.
+  local -a rel_paths=()
+  if [[ -d "$src_dir" ]]; then
+    while IFS= read -r -d '' src_file; do
+      rel_paths+=("${src_file#$src_dir/}")
+    done < <(find "$src_dir" \
+      -name 'node_modules' -prune -o \
+      -type f -name "$pattern" ! -name '*.lock' -print0 \
+      2>/dev/null)
+  fi
+  if [[ -d "$dst_dir" ]]; then
+    while IFS= read -r -d '' dst_file; do
+      rel_paths+=("${dst_file#$dst_dir/}")
+    done < <(find "$dst_dir" \
+      -name 'node_modules' -prune -o \
+      -type f -name "$pattern" ! -name '*.lock' -print0 \
+      2>/dev/null)
+  fi
+
+  if [[ ${#rel_paths[@]} -eq 0 ]]; then
+    return 0
+  fi
+
+  while IFS= read -r rel_path; do
+    [[ -z "$rel_path" ]] && continue
+    sync_common::sync_file "$src_dir/$rel_path" "$dst_dir/$rel_path" "$rel_path" || true
+  done < <(printf '%s\n' "${rel_paths[@]}" | sort -u)
 }
