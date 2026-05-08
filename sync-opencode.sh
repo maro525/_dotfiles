@@ -14,8 +14,8 @@ sync_common::parse_args "$(basename "$0")" "Sync ~/.config/opencode dotfiles to 
 sync_common::show_header "$(basename "$0")"
 
 # top-level files
-# AGENTS.md is unified at repo root and shared across CLIs (Claude / OpenCode / pi).
-sync_common::sync_file "$SOURCE/AGENTS.md"      "$SCRIPT_DIR/AGENTS.md"     "AGENTS.md" || true
+# AGENTS.md is OpenCode-specific (per-CLI split — pi has its own pi/AGENTS.md).
+sync_common::sync_file "$SOURCE/AGENTS.md"      "$DEST/AGENTS.md"           "opencode/AGENTS.md" || true
 sync_common::sync_file "$SOURCE/opencode.jsonc" "$DEST/opencode.jsonc"      "opencode.jsonc" || true
 sync_common::sync_file "$SOURCE/config.toml"    "$DEST/config.toml"         "config.toml" || true
 
