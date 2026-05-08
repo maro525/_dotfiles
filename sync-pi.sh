@@ -41,7 +41,7 @@ mkdir -p "$DEST/skills"
 for skill in "${WORKFLOW_SKILLS[@]}"; do
   src="$SOURCE/skills/$skill"
   if [[ -d "$src" ]]; then
-    sync_common::sync_rsync_dir "$src" "$DEST/skills/$skill" "skills/$skill"
+    sync_common::sync_directory "$src" "$DEST/skills/$skill" "*"
   else
     echo "Warning: $src not found in HOME — run sync-pi.sh after deploying first." >&2
   fi

@@ -26,7 +26,7 @@ sync_common::sync_directory "$SOURCE/agents" "$DEST/agents" "*.md" || true
 sync_common::sync_directory "$SOURCE/commands" "$DEST/commands" "*.md" || true
 
 # skills (recursive — includes nested SKILL.md and assets)
-sync_common::sync_rsync_dir "$SOURCE/skills" "$DEST/skills" "skills"
+sync_common::sync_directory "$SOURCE/skills" "$DEST/skills" "*" || true
 
 echo ""
 echo "Done."
