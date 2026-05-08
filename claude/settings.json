@@ -1,11 +1,12 @@
 {
   "$schema": "https://json.schemastore.org/claude-code-settings.json",
   "env": {
-    "CLAUDE_CODE_DISABLE_ADAPTIVE_THINKING": "1",
+
     "CLAUDE_CODE_NO_FLICKER": "0"
   },
   "includeGitInstructions": true,
   "permissions": {
+    "defaultMode": "auto",
     "allow": [
       "Edit",
       "Read",
@@ -203,9 +204,14 @@
       }
     ]
   },
-  "alwaysThinkingEnabled": true,
+  "thinking": {
+    "type": "adaptive"
+  },
+  "output_config": {
+    "effort": "xhigh"
+  },
+  "display": "summarized",
   "skipDangerousModePermissionPrompt": true,
-  "disableAutoMode": "disable",
   "teammateMode": "in-process",
   "verbose": true,
   "remoteControlAtStartup": true,
