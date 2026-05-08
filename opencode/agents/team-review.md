@@ -11,7 +11,6 @@ permission:
     "pytest *": allow
     "npm test*": allow
     "ruff *": allow
-    "opencode run *": allow
 ---
 
 # team-review
@@ -59,11 +58,10 @@ $ARGUMENTS: "{task description} --tier={S|M|L} --task-file={TASK_FILE} --linear-
 観点: 可読性・命名・重複・SOLID原則。
 
 ### Logic Reviewer
-観点: バグ・エッジケース・エラーハンドリング。別 OpenCode セッションで:
+観点: バグ・エッジケース・エラーハンドリング。`task` tool で並列 subagent として起動:
 
-```bash
-opencode run -m github-copilot/gpt-5.5 "以下のコード変更を Logic 観点でレビュー: {変更ファイル内容}" 2>/dev/null
-```
+- prompt: "以下のコード変更を Logic 観点（バグ・エッジケース・エラーハンドリング）でレビュー: {変更ファイル内容}"
+- 期待: severity 付きの指摘リストを返す
 
 ### Security Reviewer
 `.claude/rules/security.md` を Read し、記載ルールに従って変更ファイルをチェック。
