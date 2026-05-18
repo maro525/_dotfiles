@@ -193,7 +193,7 @@ test(dogfood): YYYY-MM-DD run — {summary}
 {what-passed}
 {what-blocked-and-why}
 
-Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+Co-Authored-By: Claude <noreply@anthropic.com>
 EOF
 )"
 git push -u origin test/dogfood-$(date +%Y-%m-%d)
