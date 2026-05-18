@@ -53,12 +53,24 @@ Don't proceed to §1.2 until both checks pass.
 
 ```bash
 mkdir -p dogfood-output/screenshots dogfood-output/videos
-cp {SKILL_DIR}/templates/report-template.md dogfood-output/report-$(date +%Y-%m-%d).md
 ```
 
-Fill in the report header fields: date, app URL, accounts, fixtures.
+Check whether a report already exists:
 
-Then pre-populate `## テスト実行状況` with every step from `test-plan.md`, each as a `- [ ]` task-list item with 操作者 / 操作 / 確認ポイント filled in verbatim and 結果 left blank. This makes the report show the full intended scope upfront — execution then just flips boxes and fills in 結果.
+```bash
+ls -t dogfood-output/report-*.md 2>/dev/null | head -1
+```
+
+- **If one exists** → reuse it as-is. Skip the rest of this section. Already-completed steps are marked `- [x]`; §3 will pick up at the first `- [ ]`.
+- **If none exists** → create today's report from the template:
+
+  ```bash
+  cp {SKILL_DIR}/templates/report-template.md dogfood-output/report-$(date +%Y-%m-%d).md
+  ```
+
+  Fill in the report header fields: date, app URL, accounts, fixtures.
+
+  Then pre-populate `## テスト実行状況` with every step from `test-plan.md`, each as a `- [ ]` task-list item with 操作者 / 操作 / 確認ポイント filled in verbatim and 結果 left blank. This makes the report show the full intended scope upfront — execution then just flips boxes and fills in 結果.
 
 ## 2. Authenticate each actor
 
@@ -82,7 +94,9 @@ Use separate sessions per actor. Typical names: `{app}-customer`, `{app}-admin`.
 
 ## 3. Execute each test
 
-For every step in the plan:
+**Run only unchecked steps.** Walk the report's `## テスト実行状況` section top-to-bottom and execute each `- [ ]` step. Skip any `- [x]` — it was completed in a prior run. This makes the skill idempotent: re-invoking it always continues from the first unchecked step. Steps blocked previously by an `ISSUE-NNN` stay `- [ ]`; the next run will retry them and naturally pass if the issue was fixed.
+
+For every unchecked step:
 
 1. **Snapshot first** — `snapshot -i` gives fresh refs. Refs change after state changes; do not reuse old refs.
 2. **Perform the action** — `click @eN` / `fill @eN "..."` / `upload @eN path1 path2` / `scroll down N`.
