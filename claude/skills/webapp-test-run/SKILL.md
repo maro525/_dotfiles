@@ -233,8 +233,13 @@ Static issues (typos, layout) need one annotated screenshot. Interactive issues 
 After all tests (or at a natural stopping point):
 
 1. Update the report's `## テスト実行状況` section. For **every** step, copy the test item from the plan (操作者 / 操作 / 確認ポイント) verbatim and add the result (✅ / ⏸ / ❌ + what actually happened) plus the screenshot. Each step is a GitHub task-list item — `- [x]` for executed steps (regardless of pass/fail), `- [ ]` for not-yet-run steps. The report must be self-contained — never collapse a step to just a status line.
-2. Close sessions: `agent-browser --session X close` for each.
-3. Commit to a dated branch. If a branch with the same date already exists (e.g. you re-ran the suite the same day), append `-2`, `-3`, etc.:
+2. **Clean up test data (optional, recommended for shared environments).** Anything you created during the run — orders, users, uploaded files — is now real data in the DB. Remove it before closing out:
+   - As the privileged actor, delete the records you created. Use the entity IDs you stored in §3.
+   - If the app has a "Reset test data" admin action or seed script, prefer that over manual deletion.
+   - For ephemeral local environments where DB reseeding is cheap, you can skip this and re-seed before the next run instead.
+   - **Skip** cleanup if a failing test left data you need to inspect afterward — note this in the commit message so the next run knows the DB isn't clean.
+3. Close sessions: `agent-browser --session X close` for each.
+4. Commit to a dated branch. If a branch with the same date already exists (e.g. you re-ran the suite the same day), append `-2`, `-3`, etc.:
 
 ```bash
 # Pick a unique branch name: test/dogfood-YYYY-MM-DD, or -2/-3/... if it exists.
