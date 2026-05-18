@@ -29,6 +29,28 @@ Execute a plan from `webapp-test-plan` (or any similarly structured plan) agains
 
 ## 1. Initialize
 
+### 1.1 Pre-flight checks
+
+Verify before doing anything else. Skipping these wastes the first 10–20 tool calls flailing inside §2.
+
+1. **`agent-browser` is installed and runnable**
+   ```bash
+   agent-browser --version
+   ```
+   - If "command not found": `brew install agent-browser`, then re-check.
+
+2. **Target app is reachable**
+   ```bash
+   curl -sf -o /dev/null -w "%{http_code}\n" "{APP_URL}"
+   ```
+   - Expect a 2xx or 3xx code.
+   - `000` / connection refused → dev server isn't running. Start it (`pnpm dev`, `npm run dev`, etc.) and re-check.
+   - Unexpected 4xx → confirm URL and port are correct (default 3000 may be taken; the actual port shows in the dev-server output).
+
+Don't proceed to §1.2 until both checks pass.
+
+### 1.2 Set up the report
+
 ```bash
 mkdir -p dogfood-output/screenshots dogfood-output/videos
 cp {SKILL_DIR}/templates/report-template.md dogfood-output/report-$(date +%Y-%m-%d).md
