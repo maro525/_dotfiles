@@ -63,15 +63,39 @@
 
 ## テスト実行状況
 
-<!-- Inline sections per step — not a table. Embed screenshots with ![alt](path). -->
+<!--
+  Inline sections per step — not a table. Embed screenshots with ![alt](path).
+
+  REQUIRED for every step: copy the test item from the plan verbatim so the
+  report is self-contained. Each step MUST include:
+    - 操作者 (actor: 顧客B / 管理者A / ...)
+    - 操作 (action — copied from the plan's 操作 column)
+    - 確認ポイント (verification point — copied from the plan's 確認ポイント column)
+    - 結果 (✅/⏸/❌ + what actually happened; reference ISSUE-NNN if a bug)
+  Never collapse a step to just a status + screenshot. The plan content must
+  be present in the report itself so readers don't need to cross-reference
+  the plan.
+-->
 
 ### テスト1: {workflow name}
 
-**1-1** ✅ {what happened}
+対象: {scope — 計画書から転記}
+
+ステータス遷移: `{S0} -> {S1} -> ...` （計画書から転記）
+
+**1-1** ✅
+- 操作者: {顧客B / 管理者A}
+- 操作: {計画書の「操作」をそのまま転記}
+- 確認ポイント: {計画書の「確認ポイント」をそのまま転記}
+- 結果: {実際に起きたこと。問題があれば ISSUE-NNN を参照}
 
 ![test-1-1](screenshots/test-1-1.png)
 
-**1-2** ✅ {what happened}
+**1-2** ✅
+- 操作者: ...
+- 操作: ...
+- 確認ポイント: ...
+- 結果: ...
 
 ![test-1-2](screenshots/test-1-2.png)
 
