@@ -29,12 +29,48 @@ Execute a plan from `webapp-test-plan` (or any similarly structured plan) agains
 
 ## 1. Initialize
 
+### 1.1 Pre-flight checks
+
+Verify before doing anything else. Skipping these wastes the first 10–20 tool calls flailing inside §2.
+
+1. **`agent-browser` is installed and runnable**
+   ```bash
+   agent-browser --version
+   ```
+   - If "command not found": `brew install agent-browser`, then re-check.
+
+2. **Target app is reachable**
+   ```bash
+   curl -sf -o /dev/null -w "%{http_code}\n" "{APP_URL}"
+   ```
+   - Expect a 2xx or 3xx code.
+   - `000` / connection refused → dev server isn't running. Start it (`pnpm dev`, `npm run dev`, etc.) and re-check.
+   - Unexpected 4xx → confirm URL and port are correct (default 3000 may be taken; the actual port shows in the dev-server output).
+
+Don't proceed to §1.2 until both checks pass.
+
+### 1.2 Set up the report
+
 ```bash
 mkdir -p dogfood-output/screenshots dogfood-output/videos
-cp {SKILL_DIR}/templates/report-template.md dogfood-output/report-$(date +%Y-%m-%d).md
 ```
 
-Fill in the report header fields: date, app URL, accounts, fixtures.
+Check whether a report already exists:
+
+```bash
+ls -t dogfood-output/report-*.md 2>/dev/null | head -1
+```
+
+- **If one exists** → reuse it as-is. Skip the rest of this section. Already-completed steps are marked `- [x]`; §3 will pick up at the first `- [ ]`.
+- **If none exists** → create today's report from the template:
+
+  ```bash
+  cp {SKILL_DIR}/templates/report-template.md dogfood-output/report-$(date +%Y-%m-%d).md
+  ```
+
+  Fill in the report header fields: date, app URL, accounts, fixtures.
+
+  Then pre-populate `## テスト実行状況` with every step from `test-plan.md`, each as a `- [ ]` task-list item with 操作者 / 操作 / 確認ポイント filled in verbatim and 結果 left blank. This makes the report show the full intended scope upfront — execution then just flips boxes and fills in 結果.
 
 ## 2. Authenticate each actor
 
@@ -43,7 +79,9 @@ Standard pattern:
 ```bash
 agent-browser --session {role}-session open {APP_URL}{SIGN_IN_PATH}
 agent-browser --session {role}-session wait --load networkidle
-agent-browser --session {role}-session snapshot -i | grep -E "textbox|button.*ログ"
+agent-browser --session {role}-session snapshot -i | grep -iE "textbox|button"
+# Locale-agnostic: pulls every form field and button. Pick the submit button
+# from the results (sign in / ログイン / 登录 / etc. — depends on the app).
 # Pipe into fill + click
 agent-browser --session {role}-session fill @eN "{email}"
 agent-browser --session {role}-session fill @eM "{password}"
@@ -56,7 +94,9 @@ Use separate sessions per actor. Typical names: `{app}-customer`, `{app}-admin`.
 
 ## 3. Execute each test
 
-For every step in the plan:
+**Run only unchecked steps.** Walk the report's `## テスト実行状況` section top-to-bottom and execute each `- [ ]` step. Skip any `- [x]` — it was completed in a prior run. This makes the skill idempotent: re-invoking it always continues from the first unchecked step. Steps blocked previously by an `ISSUE-NNN` stay `- [ ]`; the next run will retry them and naturally pass if the issue was fixed.
+
+For every unchecked step:
 
 1. **Snapshot first** — `snapshot -i` gives fresh refs. Refs change after state changes; do not reuse old refs.
 2. **Perform the action** — `click @eN` / `fill @eN "..."` / `upload @eN path1 path2` / `scroll down N`.
@@ -124,11 +164,26 @@ agent-browser --session s screenshot "[data-testid=check-count-card]" dogfood-ou
 
 When scoping, the screenshot still represents the step's verification point — keep one screenshot per step, just smaller.
 
-## 4. Common automation gotchas (READ THIS)
+### 3.2 Check console/errors at test boundaries
 
-See `references/agent-browser-gotchas.md` for the full list. Top items:
+After finishing each test (not each step), inspect every open session for silent failures:
 
-### 4.1 `<div onClick>` doesn't respond to `click @eN`
+```bash
+agent-browser --session {role}-session errors
+agent-browser --session {role}-session console 2>&1 | grep -iE "error|warn|failed|4[0-9]{2}|5[0-9]{2}" | head -20
+```
+
+A visibly passing test can still hide bugs: failed fetches, uncaught promise rejections, React key warnings, 4xx/5xx responses. If new entries appear since the previous boundary, file them as an ISSUE-NNN with category `console` even when the UI checkpoint passed — silent failures are the ones users hit later.
+
+**Ignore dev-only noise** (add to your filter as you find them): React DevTools nags, Fast Refresh / HMR logs, Next.js telemetry, source-map fetch warnings, hydration mismatch warnings that disappear on reload.
+
+**Why per-test, not per-step**: per-step is too noisy and burns tool calls; end-of-run is too coarse to localize which test introduced the error. Per-test gives you a usable bisection.
+
+## Automation gotchas (consult during §3 Execute)
+
+This is reference material, not a sequential phase — open it when a step doesn't behave as expected. See `references/agent-browser-gotchas.md` for the full list. Top items:
+
+### `<div onClick>` doesn't respond to `click @eN`
 
 Symptom: snapshot shows `generic "..." [ref=eN] clickable [cursor:pointer, onclick]` (note: `generic`, not `button`). Clicking does nothing; state doesn't change.
 
@@ -140,27 +195,27 @@ Symptom: snapshot shows `generic "..." [ref=eN] clickable [cursor:pointer, oncli
    agent-browser --session s eval "(() => { const c = Array.from(document.querySelectorAll('div')).filter(el => el.textContent.includes('LABEL') && el.onclick); c[0].click(); return 'clicked'; })()"
    ```
 
-### 4.2 Radix dialog triggers need a wait
+### Radix dialog triggers need a wait
 
 A button with `aria-haspopup="dialog"` and `aria-expanded="false"` opens an AlertDialog. After clicking, wait ≥1500 ms before snapshotting, or the dialog content won't be in the tree yet.
 
-### 4.3 Refs renumber after any state change
+### Refs renumber after any state change
 
 Do **not** chain long action sequences using old refs. Re-snapshot after each state change. `@e27` before a navigation is a different element than `@e27` after.
 
-### 4.4 Date pickers need scroll-into-view first
+### Date pickers need scroll-into-view first
 
 Calendar popovers position relative to the trigger. If the trigger is off-screen, the popover may render below the fold. `scroll down N` until the trigger is visible, *then* click.
 
-### 4.5 Submit button inconsistency
+### Submit button inconsistency
 
 Some forms have duplicate submit buttons (mobile header + desktop footer). They can map to different form instances. If the first one doesn't submit, try the other. Verify via `eval "window.location.href"` whether navigation happened.
 
-### 4.6 File upload
+### File upload
 
 Use `upload @eInputRef path1 [path2 ...]`. Multiple files in one call creates N separate entities (not N attached to one). Useful for multi-item flows.
 
-## 5. Document issues as you find them
+## 4. Document issues as you find them
 
 Every bug is an `### ISSUE-NNN` block in the report with:
 - Severity (critical / high / medium / low)
@@ -173,16 +228,30 @@ Static issues (typos, layout) need one annotated screenshot. Interactive issues 
 
 **Do NOT batch** issue writing for later. Append immediately on discovery so the report survives a mid-session stop.
 
-## 6. Wrap up: report + git
+## 5. Wrap up: report + git
 
 After all tests (or at a natural stopping point):
 
-1. Update the report's `## テスト実行状況` section with each step's status (✅ / ⏸ / ❌) and screenshot file.
-2. Close sessions: `agent-browser --session X close` for each.
-3. Commit to a dated branch:
+1. Update the report's `## テスト実行状況` section. For **every** step, copy the test item from the plan (操作者 / 操作 / 確認ポイント) verbatim and add the result (✅ / ⏸ / ❌ + what actually happened) plus the screenshot. Each step is a GitHub task-list item — `- [x]` for executed steps (regardless of pass/fail), `- [ ]` for not-yet-run steps. The report must be self-contained — never collapse a step to just a status line.
+2. **Clean up test data (optional, recommended for shared environments).** Anything you created during the run — orders, users, uploaded files — is now real data in the DB. Remove it before closing out:
+   - As the privileged actor, delete the records you created. Use the entity IDs you stored in §3.
+   - If the app has a "Reset test data" admin action or seed script, prefer that over manual deletion.
+   - For ephemeral local environments where DB reseeding is cheap, you can skip this and re-seed before the next run instead.
+   - **Skip** cleanup if a failing test left data you need to inspect afterward — note this in the commit message so the next run knows the DB isn't clean.
+3. Close sessions: `agent-browser --session X close` for each.
+4. Commit to a dated branch. If a branch with the same date already exists (e.g. you re-ran the suite the same day), append `-2`, `-3`, etc.:
 
 ```bash
-git checkout -b test/dogfood-$(date +%Y-%m-%d)
+# Pick a unique branch name: test/dogfood-YYYY-MM-DD, or -2/-3/... if it exists.
+BASE="test/dogfood-$(date +%Y-%m-%d)"
+BRANCH="$BASE"
+N=2
+while git show-ref --quiet "refs/heads/$BRANCH"; do
+  BRANCH="${BASE}-${N}"
+  N=$((N+1))
+done
+
+git checkout -b "$BRANCH"
 git add dogfood-output/
 # Add any app-code fixes that unblocked automation (if you made them)
 git commit -m "$(cat <<EOF
@@ -191,31 +260,56 @@ test(dogfood): YYYY-MM-DD run — {summary}
 {what-passed}
 {what-blocked-and-why}
 
-Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+Co-Authored-By: Claude <noreply@anthropic.com>
 EOF
 )"
-git push -u origin test/dogfood-$(date +%Y-%m-%d)
+git push -u origin "$BRANCH"
 ```
+
+(The loop only checks local branches; if a remote branch with the same name exists from another machine, `git push` will reject — bump the suffix manually in that case.)
 
 **Do not** include unrelated changes (e.g. `pnpm-lock.yaml` if you didn't touch deps). `git status` first.
 
-**Do not** push until the user has seen the report and confirmed the run is complete, unless they've asked for auto-commit.
-
 ## Formatting the report
 
-Use `templates/report-template.md` as the skeleton. The `## テスト実行状況` section should use **inline sections per step with embedded screenshots**, not one big table:
+Use `templates/report-template.md` as the skeleton. The `## テスト実行状況` section should use **inline sections per step with embedded screenshots**, not one big table.
+
+**Each step MUST include the test item itself** (copied from the plan), not only the result. A reader should be able to understand what was tested without opening `test-plan.md`. Required per step:
+
+- Checkbox prefix (`- [x]` = executed / `- [ ]` = not yet executed). At initialization, all steps are unchecked. Flip to checked as each step runs (regardless of pass/fail).
+- 操作者 (actor — e.g. 顧客B / 管理者A)
+- 操作 (action — copied verbatim from the plan's 操作 column)
+- 確認ポイント (verification point — copied verbatim from the plan's 確認ポイント column)
+- 結果 (✅/⏸/❌ + what actually happened; link ISSUE-NNN if a bug was found. For unchecked steps, write 未実行 + reason)
+
+Status icon meaning: ✅ pass, ⏸ partially run / blocked mid-step, ❌ fail. "Not yet run at all" stays as `- [ ]` with no icon.
 
 ```markdown
 ### テスト1: {workflow name}
 
-**1-1** ✅ {one-line description}
+対象: {scope — 計画書から転記}
+ステータス遷移: `{S0} -> {S1} -> ...`
 
-![test-1-1](screenshots/test-1-1.png)
+- [x] **1-1** ✅
+  - 操作者: 顧客B
+  - 操作: ログインしてダッシュボードを開く
+  - 確認ポイント: 「新規注文」ボタンが表示される
+  - 結果: ボタン表示確認、URL `/dashboard` に遷移
 
-**1-2** ✅ ...
+  ![test-1-1](screenshots/test-1-1.png)
+
+- [ ] **1-2**
+  - 操作者: 顧客B
+  - 操作: 新規注文フォームを送信
+  - 確認ポイント: 注文一覧に表示される
+  - 結果: 未実行（ブロッカー: ISSUE-001 で送信ボタンが反応しない）
 ```
 
-Long wide tables are hard to read in rendered markdown. Inline sections with images interleaved work better.
+Long wide tables are hard to read in rendered markdown. Task-list items with images interleaved work better, the checkbox makes executed/未実行 a glanceable signal, and the bulleted test-item block keeps each step self-describing.
+
+### Initialization: pre-populate all steps as unchecked
+
+At the start of the run (§1 Initialize), after copying the template, walk through `test-plan.md` and pre-populate the `## テスト実行状況` section with **every** step from the plan, all marked `- [ ]`. This way the report shows the complete coverage scope from the start, and execution simply flips boxes as you go. If you stop mid-run, the unchecked steps document exactly what's left.
 
 ## Guidance
 
