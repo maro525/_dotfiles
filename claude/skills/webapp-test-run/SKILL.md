@@ -67,7 +67,9 @@ Standard pattern:
 ```bash
 agent-browser --session {role}-session open {APP_URL}{SIGN_IN_PATH}
 agent-browser --session {role}-session wait --load networkidle
-agent-browser --session {role}-session snapshot -i | grep -E "textbox|button.*ログ"
+agent-browser --session {role}-session snapshot -i | grep -iE "textbox|button"
+# Locale-agnostic: pulls every form field and button. Pick the submit button
+# from the results (sign in / ログイン / 登录 / etc. — depends on the app).
 # Pipe into fill + click
 agent-browser --session {role}-session fill @eN "{email}"
 agent-browser --session {role}-session fill @eM "{password}"
