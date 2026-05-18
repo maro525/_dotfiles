@@ -4,10 +4,15 @@
 |-------|-------|
 | **Date** | {YYYY-MM-DD} |
 | **App URL** | {http://localhost:PORT} |
-| **Session** | {session-customer / session-admin} |
 | **Scope** | `dogfood-output/test-plan.md` に従った N テスト |
-| **Accounts** | Customer: {email} / Admin: {email} |
 | **Fixtures** | {reused files} |
+
+## Sessions
+
+| Session | Account |
+|---------|---------|
+| `{session-name-1}` | {email-1} |
+| `{session-name-2}` | {email-2} |
 
 ## Summary
 
