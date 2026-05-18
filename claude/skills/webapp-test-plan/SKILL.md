@@ -1,14 +1,14 @@
 ---
 name: webapp-test-plan
-description: Generate a comprehensive manual/automation-ready test plan from a webapp codebase. Analyzes routes, domain enums (status, role), role-separated flows, UI surfaces (tabs/filters/docs/chat), and fixture requirements. Produces `dogfood-output/test-plan.md` with per-step screenshot refs aligned to the `webapp-test-run` skill. Use when asked to "plan test coverage", "design dogfood tests", "build a test plan for this app", or "QA checklist".
+description: Generate a comprehensive manual/automation-ready test plan from a webapp codebase. Analyzes routes, domain enums (status, role), role-separated flows (whatever roles the app has — customer/admin, author/reviewer, buyer/seller, etc.), UI surfaces (tabs/filters/docs/chat), and fixture requirements. Produces `dogfood-output/test-plan.md` with per-step screenshot refs aligned to the `webapp-test-run` skill. Use when asked to "plan test coverage", "design dogfood tests", "build a test plan for this app", or "QA checklist".
 ---
 
 # Webapp Test Plan Generator
 
 Produce a structured test plan that:
 - Covers the full lifecycle of the primary domain entity (e.g. Order, Booking, Ticket)
-- Separates role-based operations (customer vs admin) clearly
-- Enumerates UI surfaces beyond the happy path: tabs, filters, document DL, chat, notifications
+- Separates role-based operations clearly — use whatever roles the app actually has (customer/admin, author/reviewer, buyer/seller, owner/member/viewer, …). Don't force a customer/admin split if it doesn't match.
+- Enumerates UI surfaces beyond the happy path: tabs, filters, document DL, chat, notifications — only if the app has them
 - Lists required fixtures (upload files, seeded users)
 - Aligns screenshot naming with the `webapp-test-run` skill so the plan can be executed downstream
 
@@ -44,23 +44,23 @@ For the primary entity (Order/Booking/Ticket/etc):
 
 - List every status in the enum
 - Find the status-transition logic file (`lib/domain/*/logic.ts` or similar) — this is the source of truth
-- Identify **admin-only statuses** that are hidden/renamed from customer view (e.g. `LOST` → customer sees `ESTIMATION_COMPLETED`)
+- Identify **role-restricted statuses** that are hidden or renamed in lower-privilege roles' views (e.g. an admin-only `LOST` status that the customer role sees as `ESTIMATION_COMPLETED`)
 - If entities are grouped (e.g. `OrderGroup`, cart, bundle), enumerate **derived group statuses** (PARTIALLY_X, ALL_X)
 
-Produce a table like:
+Produce a table like (using whichever roles your app has — admin/customer is just an illustrative example):
 
 ```markdown
-| OrderStatus          | 管理者ラベル | 顧客ラベル     |
-|----------------------|--------------|----------------|
-| ESTIMATION_REQUESTED | 見積依頼中   | 見積依頼中     |
-| ESTIMATION_COMPLETED | 見積済み     | 見積済み       |
-| LOST                 | 失注         | 見積済み (隠蔽)|
-| ARRANGED             | 手配済み     | 注文済み (隠蔽)|
+| OrderStatus          | {role-A} ラベル | {role-B} ラベル |
+|----------------------|-----------------|------------------|
+| ESTIMATION_REQUESTED | 見積依頼中       | 見積依頼中        |
+| ESTIMATION_COMPLETED | 見積済み         | 見積済み          |
+| LOST                 | 失注             | 見積済み (隠蔽)   |
+| ARRANGED             | 手配済み         | 注文済み (隠蔽)   |
 ```
 
 ### 3. Map routes × actors × actions
 
-For each role, list the main routes:
+For each role, list the main routes. Example for a customer/admin EC app — adapt to your app's actual roles (a multi-tenant SaaS may have owner/member/viewer; a marketplace may have buyer/seller/moderator):
 
 - **Customer**: `/dashboard`, `/dashboard/orders/[id]`, `/dashboard/cart`, `/dashboard/cart/confirmation`
 - **Admin**: `/admin/dashboard`, `/admin/dashboard/orders/[id]`
@@ -89,12 +89,12 @@ Use `templates/test-plan-template.md` as the starting skeleton. Structure:
 1. **前提** — target URLs, actors, test rationale
 2. **実装分析サマリ** — 4-8 bullet-point findings from steps 1-3
 3. **アップロード準備** — constraint limits + fixture table + 既存再利用候補
-4. **スクショ撮影ルール** — naming: `test-<N>-<M>.png`, per-step screenshot required, variants (`-a`/`-b`/`-customer`/`-admin`)
-5. **テスト 1..N** — one section per workflow with this table shape:
+4. **スクショファイル名規約** — naming only: `test-<N>-<M>.png` per step. Don't prescribe capture timing, scope, or `--annotate` usage — those are runtime concerns owned by the `webapp-test-run` skill.
+5. **テスト 1..N** — one section per workflow with this table shape (use whatever actor labels your app uses):
    ```
-   | #   | 操作者  | 操作 | 確認ポイント | スクショ       |
-   |-----|---------|------|--------------|----------------|
-   | 1-1 | 顧客B   | ...  | ...          | `test-1-1.png` |
+   | #   | 操作者       | 操作 | 確認ポイント | スクショ       |
+   |-----|--------------|------|--------------|----------------|
+   | 1-1 | `{actor-1}`  | ...  | ...          | `test-1-1.png` |
    ```
 6. **実行順序** — short numbered list with rationale (basics first, edge cases after)
 7. **ステータス一覧（参考）** — enum → label tables, derived statuses
@@ -116,7 +116,9 @@ Aim for **5-9 tests total**. Each test should have 5-17 steps. If a test has 20+
 
 ### Role naming convention
 
-Use Japanese shorthand if the app is in Japanese (顧客B / 管理者A), English otherwise (customer / admin). Consistency matters more than choice.
+Use the roles the app actually has — customer/admin, author/editor/reviewer/admin, buyer/seller, owner/member/viewer, etc. Don't shoehorn an app into customer/admin if it doesn't fit.
+
+Pick labels matching the app's UI language: Japanese app → `顧客B` / `管理者A`; English app → `customer` / `admin`. Consistency within a single plan matters more than which form you pick.
 
 ### Don't
 
