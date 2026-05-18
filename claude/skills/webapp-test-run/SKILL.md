@@ -126,11 +126,11 @@ agent-browser --session s screenshot "[data-testid=check-count-card]" dogfood-ou
 
 When scoping, the screenshot still represents the step's verification point — keep one screenshot per step, just smaller.
 
-## 4. Common automation gotchas (READ THIS)
+## Automation gotchas (consult during §3 Execute)
 
-See `references/agent-browser-gotchas.md` for the full list. Top items:
+This is reference material, not a sequential phase — open it when a step doesn't behave as expected. See `references/agent-browser-gotchas.md` for the full list. Top items:
 
-### 4.1 `<div onClick>` doesn't respond to `click @eN`
+### `<div onClick>` doesn't respond to `click @eN`
 
 Symptom: snapshot shows `generic "..." [ref=eN] clickable [cursor:pointer, onclick]` (note: `generic`, not `button`). Clicking does nothing; state doesn't change.
 
@@ -142,27 +142,27 @@ Symptom: snapshot shows `generic "..." [ref=eN] clickable [cursor:pointer, oncli
    agent-browser --session s eval "(() => { const c = Array.from(document.querySelectorAll('div')).filter(el => el.textContent.includes('LABEL') && el.onclick); c[0].click(); return 'clicked'; })()"
    ```
 
-### 4.2 Radix dialog triggers need a wait
+### Radix dialog triggers need a wait
 
 A button with `aria-haspopup="dialog"` and `aria-expanded="false"` opens an AlertDialog. After clicking, wait ≥1500 ms before snapshotting, or the dialog content won't be in the tree yet.
 
-### 4.3 Refs renumber after any state change
+### Refs renumber after any state change
 
 Do **not** chain long action sequences using old refs. Re-snapshot after each state change. `@e27` before a navigation is a different element than `@e27` after.
 
-### 4.4 Date pickers need scroll-into-view first
+### Date pickers need scroll-into-view first
 
 Calendar popovers position relative to the trigger. If the trigger is off-screen, the popover may render below the fold. `scroll down N` until the trigger is visible, *then* click.
 
-### 4.5 Submit button inconsistency
+### Submit button inconsistency
 
 Some forms have duplicate submit buttons (mobile header + desktop footer). They can map to different form instances. If the first one doesn't submit, try the other. Verify via `eval "window.location.href"` whether navigation happened.
 
-### 4.6 File upload
+### File upload
 
 Use `upload @eInputRef path1 [path2 ...]`. Multiple files in one call creates N separate entities (not N attached to one). Useful for multi-item flows.
 
-## 5. Document issues as you find them
+## 4. Document issues as you find them
 
 Every bug is an `### ISSUE-NNN` block in the report with:
 - Severity (critical / high / medium / low)
@@ -175,7 +175,7 @@ Static issues (typos, layout) need one annotated screenshot. Interactive issues 
 
 **Do NOT batch** issue writing for later. Append immediately on discovery so the report survives a mid-session stop.
 
-## 6. Wrap up: report + git
+## 5. Wrap up: report + git
 
 After all tests (or at a natural stopping point):
 
