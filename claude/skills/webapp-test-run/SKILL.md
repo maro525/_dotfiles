@@ -177,7 +177,7 @@ Static issues (typos, layout) need one annotated screenshot. Interactive issues 
 
 After all tests (or at a natural stopping point):
 
-1. Update the report's `## テスト実行状況` section with each step's status (✅ / ⏸ / ❌) and screenshot file.
+1. Update the report's `## テスト実行状況` section. For **every** step, copy the test item from the plan (操作者 / 操作 / 確認ポイント) verbatim and add the result (✅ / ⏸ / ❌ + what actually happened) plus the screenshot. The report must be self-contained — never collapse a step to just a status line.
 2. Close sessions: `agent-browser --session X close` for each.
 3. Commit to a dated branch:
 
@@ -203,19 +203,31 @@ git push -u origin test/dogfood-$(date +%Y-%m-%d)
 
 ## Formatting the report
 
-Use `templates/report-template.md` as the skeleton. The `## テスト実行状況` section should use **inline sections per step with embedded screenshots**, not one big table:
+Use `templates/report-template.md` as the skeleton. The `## テスト実行状況` section should use **inline sections per step with embedded screenshots**, not one big table.
+
+**Each step MUST include the test item itself** (copied from the plan), not only the result. A reader should be able to understand what was tested without opening `test-plan.md`. Required per step:
+
+- 操作者 (actor — e.g. 顧客B / 管理者A)
+- 操作 (action — copied verbatim from the plan's 操作 column)
+- 確認ポイント (verification point — copied verbatim from the plan's 確認ポイント column)
+- 結果 (✅/⏸/❌ + what actually happened; link ISSUE-NNN if a bug was found)
 
 ```markdown
 ### テスト1: {workflow name}
 
-**1-1** ✅ {one-line description}
+対象: {scope — 計画書から転記}
+ステータス遷移: `{S0} -> {S1} -> ...`
+
+**1-1** ✅
+- 操作者: 顧客B
+- 操作: ログインしてダッシュボードを開く
+- 確認ポイント: 「新規注文」ボタンが表示される
+- 結果: ボタン表示確認、URL `/dashboard` に遷移
 
 ![test-1-1](screenshots/test-1-1.png)
-
-**1-2** ✅ ...
 ```
 
-Long wide tables are hard to read in rendered markdown. Inline sections with images interleaved work better.
+Long wide tables are hard to read in rendered markdown. Inline sections with images interleaved work better, and the bulleted test-item block keeps each step self-describing.
 
 ## Guidance
 
