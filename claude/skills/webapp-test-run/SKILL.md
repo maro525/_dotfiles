@@ -148,6 +148,21 @@ agent-browser --session s screenshot "[data-testid=check-count-card]" dogfood-ou
 
 When scoping, the screenshot still represents the step's verification point — keep one screenshot per step, just smaller.
 
+### 3.2 Check console/errors at test boundaries
+
+After finishing each test (not each step), inspect every open session for silent failures:
+
+```bash
+agent-browser --session {role}-session errors
+agent-browser --session {role}-session console 2>&1 | grep -iE "error|warn|failed|4[0-9]{2}|5[0-9]{2}" | head -20
+```
+
+A visibly passing test can still hide bugs: failed fetches, uncaught promise rejections, React key warnings, 4xx/5xx responses. If new entries appear since the previous boundary, file them as an ISSUE-NNN with category `console` even when the UI checkpoint passed — silent failures are the ones users hit later.
+
+**Ignore dev-only noise** (add to your filter as you find them): React DevTools nags, Fast Refresh / HMR logs, Next.js telemetry, source-map fetch warnings, hydration mismatch warnings that disappear on reload.
+
+**Why per-test, not per-step**: per-step is too noisy and burns tool calls; end-of-run is too coarse to localize which test introduced the error. Per-test gives you a usable bisection.
+
 ## Automation gotchas (consult during §3 Execute)
 
 This is reference material, not a sequential phase — open it when a step doesn't behave as expected. See `references/agent-browser-gotchas.md` for the full list. Top items:
