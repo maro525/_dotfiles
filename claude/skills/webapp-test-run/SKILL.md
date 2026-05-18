@@ -212,8 +212,6 @@ git push -u origin "$BRANCH"
 
 **Do not** include unrelated changes (e.g. `pnpm-lock.yaml` if you didn't touch deps). `git status` first.
 
-**Do not** push until the user has seen the report and confirmed the run is complete, unless they've asked for auto-commit.
-
 ## Formatting the report
 
 Use `templates/report-template.md` as the skeleton. The `## テスト実行状況` section should use **inline sections per step with embedded screenshots**, not one big table.
