@@ -63,8 +63,6 @@
 
 ## テスト実行状況
 
-進捗: **{DONE}/{TOTAL}** ステップ実行済
-
 <!--
   Inline sections per step — not a table. Embed screenshots with ![alt](path).
 
