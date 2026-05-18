@@ -201,7 +201,7 @@ Static issues (typos, layout) need one annotated screenshot. Interactive issues 
 
 After all tests (or at a natural stopping point):
 
-1. Update the report's `## テスト実行状況` section. For **every** step, copy the test item from the plan (操作者 / 操作 / 確認ポイント) verbatim and add the result (✅ / ⏸ / ❌ + what actually happened) plus the screenshot. Each step is a GitHub task-list item — `- [x]` for executed steps (regardless of pass/fail), `- [ ]` for not-yet-run steps. Update the `進捗: {DONE}/{TOTAL}` line at the top to reflect the executed count. The report must be self-contained — never collapse a step to just a status line.
+1. Update the report's `## テスト実行状況` section. For **every** step, copy the test item from the plan (操作者 / 操作 / 確認ポイント) verbatim and add the result (✅ / ⏸ / ❌ + what actually happened) plus the screenshot. Each step is a GitHub task-list item — `- [x]` for executed steps (regardless of pass/fail), `- [ ]` for not-yet-run steps. The report must be self-contained — never collapse a step to just a status line.
 2. Close sessions: `agent-browser --session X close` for each.
 3. Commit to a dated branch. If a branch with the same date already exists (e.g. you re-ran the suite the same day), append `-2`, `-3`, etc.:
 
