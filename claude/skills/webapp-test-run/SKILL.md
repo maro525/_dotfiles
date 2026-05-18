@@ -181,10 +181,19 @@ After all tests (or at a natural stopping point):
 
 1. Update the report's `## テスト実行状況` section. For **every** step, copy the test item from the plan (操作者 / 操作 / 確認ポイント) verbatim and add the result (✅ / ⏸ / ❌ + what actually happened) plus the screenshot. Each step is a GitHub task-list item — `- [x]` for executed steps (regardless of pass/fail), `- [ ]` for not-yet-run steps. Update the `進捗: {DONE}/{TOTAL}` line at the top to reflect the executed count. The report must be self-contained — never collapse a step to just a status line.
 2. Close sessions: `agent-browser --session X close` for each.
-3. Commit to a dated branch:
+3. Commit to a dated branch. If a branch with the same date already exists (e.g. you re-ran the suite the same day), append `-2`, `-3`, etc.:
 
 ```bash
-git checkout -b test/dogfood-$(date +%Y-%m-%d)
+# Pick a unique branch name: test/dogfood-YYYY-MM-DD, or -2/-3/... if it exists.
+BASE="test/dogfood-$(date +%Y-%m-%d)"
+BRANCH="$BASE"
+N=2
+while git show-ref --quiet "refs/heads/$BRANCH"; do
+  BRANCH="${BASE}-${N}"
+  N=$((N+1))
+done
+
+git checkout -b "$BRANCH"
 git add dogfood-output/
 # Add any app-code fixes that unblocked automation (if you made them)
 git commit -m "$(cat <<EOF
@@ -196,8 +205,10 @@ test(dogfood): YYYY-MM-DD run — {summary}
 Co-Authored-By: Claude <noreply@anthropic.com>
 EOF
 )"
-git push -u origin test/dogfood-$(date +%Y-%m-%d)
+git push -u origin "$BRANCH"
 ```
+
+(The loop only checks local branches; if a remote branch with the same name exists from another machine, `git push` will reject — bump the suffix manually in that case.)
 
 **Do not** include unrelated changes (e.g. `pnpm-lock.yaml` if you didn't touch deps). `git status` first.
 
