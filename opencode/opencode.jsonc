@@ -8,82 +8,129 @@
       // Default: ask for anything not explicitly listed
       "*": "ask",
 
-      // DENY
+      // DENY (match Claude Code)
       "sudo *": "deny",
       "rm -rf *": "deny",
-      "git push --force*": "deny",
       "git reset": "deny",
       "git reset *": "deny",
-      "chmod *": "deny",
+      "wget *": "deny",
 
-      // ASK (explicit confirmation)
+      // ASK (match Claude Code)
       "git rebase *": "ask",
       "rm *": "ask",
-      "mkfs *": "ask",
-      "fdisk *": "ask",
-      "dd *": "ask",
 
       // ALLOW: info / version
       "* --version": "allow",
-      "pwd": "allow",
-      "whoami": "allow",
-      "which *": "allow",
-      "uname *": "allow",
 
       // ALLOW: file operations
       "cat *": "allow",
       "cp *": "allow",
       "echo *": "allow",
       "find *": "allow",
+      "for *": "allow",
       "ls *": "allow",
+      "lsof *": "allow",
       "tree *": "allow",
       "wc *": "allow",
+      "xargs *": "allow",
       "xxd *": "allow",
-      "file *": "allow",
-      "stat *": "allow",
-      "readlink *": "allow",
-      "realpath *": "allow",
+      "date *": "allow",
+      "mkdir *": "allow",
+      "mv *": "allow",
+      "node *": "allow",
+      "ss *": "allow",
+      "touch d*": "allow",
 
       // ALLOW: text processing / search
       "grep *": "allow",
-      "rg *": "allow",
-      "head *": "allow",
-      "tail *": "allow",
-      "sed *": "allow",
-      "awk *": "allow",
 
-      // ALLOW: git (reset / force handled above)
-      "git *": "allow",
+      // ALLOW: BigQuery / GitHub CLI
+      "bq ls *": "allow",
+      "bq query *": "allow",
+      "bq show *": "allow",
+      "gh pr create *": "allow",
+      "gh pr *": "allow",
+      "gh run *": "allow",
+
+      // ALLOW: git (match Claude Code; reset handled above)
+      "git * main": "allow",
+      "git add *": "allow",
+      "git init": "allow",
+      "git init *": "allow",
+      "git branch": "allow",
+      "git branch *": "allow",
+      "git checkout *": "allow",
+      "git commit *": "allow",
+      "git diff": "allow",
+      "git diff *": "allow",
+      "git fetch": "allow",
+      "git fetch *": "allow",
+      "git log": "allow",
+      "git log *": "allow",
+      "git ls-tree *": "allow",
+      "git merge *": "allow",
+      "git push": "allow",
+      "git push *": "allow",
+      "git remote get-url *": "allow",
+      "git stash": "allow",
+      "git stash *": "allow",
+      "git status": "allow",
+      "git status *": "allow",
 
       // ALLOW: node / npm / pnpm
+      "npm install": "allow",
       "npm install *": "allow",
+      "npm run": "allow",
       "npm run *": "allow",
+      "npm test": "allow",
       "npm test *": "allow",
+      "npx biome check *": "allow",
+      "npx biome format *": "allow",
       "npx eslint *": "allow",
       "npx prettier *": "allow",
       "npx tsc *": "allow",
+      "npx vinxi build *": "allow",
+      "pnpm add": "allow",
       "pnpm add *": "allow",
+      "pnpm biome check *": "allow",
+      "pnpm build": "allow",
+      "pnpm build *": "allow",
+      "pnpm build:v6": "allow",
+      "pnpm build:v6 *": "allow",
+      "pnpm check": "allow",
+      "pnpm check *": "allow",
+      "pnpm dev": "allow",
+      "pnpm dev *": "allow",
+      "pnpm dlx": "allow",
+      "pnpm dlx *": "allow",
       "pnpm install *": "allow",
       "pnpm exec eslint *": "allow",
       "pnpm exec prettier *": "allow",
       "pnpm exec tsc *": "allow",
+      "pnpm lint": "allow",
+      "pnpm lint *": "allow",
+      "pnpm run": "allow",
       "pnpm run *": "allow",
+      "pnpm run type-check": "allow",
+      "pnpm run type-check *": "allow",
+      "pnpm test": "allow",
       "pnpm test *": "allow",
+      "pnpm test-query": "allow",
+      "pnpm test-query *": "allow",
 
       // ALLOW: python / uv
+      "uv install": "allow",
       "uv install *": "allow",
+      "uv pip list": "allow",
+      "uv pip list *": "allow",
+      "uv run": "allow",
       "uv run *": "allow",
+      "uv sync": "allow",
       "uv sync *": "allow",
-      "python *": "allow",
       "python3 *": "allow",
-      "pip *": "allow",
-
-      // ALLOW: github cli
-      "gh *": "allow",
 
       // ALLOW: network
       "curl*": "allow",
-      "wget *": "allow",
 
       // ALLOW: shell control flow keywords
       "do": "allow",
@@ -92,19 +139,9 @@
       "fi": "allow",
       "then": "allow",
 
-      // ALLOW: directory / move
-      "mkdir *": "allow",
-      "mv *": "allow",
-      "touch *": "allow",
-      "ln *": "allow",
-
-      // ALLOW: build / dev tools
-      "make *": "allow",
-      "cmake *": "allow",
-      "cargo *": "allow",
-      "yarn *": "allow",
-      "bun *": "allow",
-      "deno *": "allow"
+      // ALLOW: agent tools
+      "agent-browser *": "allow",
+      "opencode run *": "allow"
     },
     "webfetch": "allow"
   },
