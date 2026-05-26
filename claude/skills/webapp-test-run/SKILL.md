@@ -1,6 +1,6 @@
 ---
 name: webapp-test-run
-description: Execute an existing test plan (`dogfood-output/test-plan.md`) against a running web app using `agent-browser`, producing a dated report with per-step screenshots. Handles dual-actor sessions (customer + admin), common React/Radix automation pitfalls, and auto-commits results to a `test/dogfood-YYYY-MM-DD` branch. Use when asked to "run the test plan", "execute dogfood tests", "automate QA from plan", "go through test-plan.md".
+description: Execute an existing test plan (`dogfood-output/test-plan.md`) against a running web app using `agent-browser`, producing a dated report with per-step screenshots. Handles dual-actor sessions (customer + admin), common React/Radix automation pitfalls, and auto-commits results on the current branch. Use when asked to "run the test plan", "execute dogfood tests", "automate QA from plan", "go through test-plan.md".
 ---
 
 # Webapp Test Plan Runner
@@ -8,7 +8,7 @@ description: Execute an existing test plan (`dogfood-output/test-plan.md`) again
 Execute a plan from `webapp-test-plan` (or any similarly structured plan) against a running webapp, producing:
 - Step-by-step screenshots in `dogfood-output/screenshots/`
 - A dated report `dogfood-output/report-YYYY-MM-DD.md`
-- A dated git branch `test/dogfood-YYYY-MM-DD` with plan + screenshots + report
+- A commit on the current branch containing the plan + screenshots + report
 
 ## Prerequisites
 
@@ -24,7 +24,7 @@ Execute a plan from `webapp-test-plan` (or any similarly structured plan) agains
 2. Authenticate   Open session per actor, sign in, verify landing URL
 3. Execute        Walk each test, step by step, with screenshots
 4. Document       Update report incrementally; flag any app bugs as ISSUEs
-5. Wrap           Close sessions, commit + push to test/dogfood-YYYY-MM-DD
+5. Wrap           Close sessions, commit + push on the current branch
 ```
 
 ## 1. Initialize
@@ -239,19 +239,9 @@ After all tests (or at a natural stopping point):
    - For ephemeral local environments where DB reseeding is cheap, you can skip this and re-seed before the next run instead.
    - **Skip** cleanup if a failing test left data you need to inspect afterward — note this in the commit message so the next run knows the DB isn't clean.
 3. Close sessions: `agent-browser --session X close` for each.
-4. Commit to a dated branch. If a branch with the same date already exists (e.g. you re-ran the suite the same day), append `-2`, `-3`, etc.:
+4. Commit on the current branch:
 
 ```bash
-# Pick a unique branch name: test/dogfood-YYYY-MM-DD, or -2/-3/... if it exists.
-BASE="test/dogfood-$(date +%Y-%m-%d)"
-BRANCH="$BASE"
-N=2
-while git show-ref --quiet "refs/heads/$BRANCH"; do
-  BRANCH="${BASE}-${N}"
-  N=$((N+1))
-done
-
-git checkout -b "$BRANCH"
 git add dogfood-output/
 # Add any app-code fixes that unblocked automation (if you made them)
 git commit -m "$(cat <<EOF
@@ -263,10 +253,8 @@ test(dogfood): YYYY-MM-DD run — {summary}
 Co-Authored-By: Claude <noreply@anthropic.com>
 EOF
 )"
-git push -u origin "$BRANCH"
+git push
 ```
-
-(The loop only checks local branches; if a remote branch with the same name exists from another machine, `git push` will reject — bump the suffix manually in that case.)
 
 **Do not** include unrelated changes (e.g. `pnpm-lock.yaml` if you didn't touch deps). `git status` first.
 
