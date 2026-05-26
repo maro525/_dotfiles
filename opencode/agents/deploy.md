@@ -4,12 +4,6 @@ mode: subagent
 temperature: 0.1
 permission:
   edit: allow
-  bash:
-    "*": ask
-    "git *": allow
-    "gh *": allow
-    "git push --force origin main": deny
-    "git push --force origin master": deny
 ---
 
 # deploy
