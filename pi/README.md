@@ -110,7 +110,7 @@ claude/settings.json の `permissions` をそのまま移植。
 
 | カテゴリ | パターン数 | 動作 |
 |---------|-----------|------|
-| **allow** | 69 | 確認なしで即実行 |
+| **allow** | Claude Code の Bash allow 相当 | 確認なしで即実行 |
 | **deny** | 4 | 即ブロック (`sudo`, `rm -rf`, `wget`, `git reset`) |
 | **ask** | 2 | ユーザーに確認 (`git rebase`, `rm`) |
 | **default** | — | 不明なコマンドは `ask` 扱い |
