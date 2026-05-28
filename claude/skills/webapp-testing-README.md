@@ -3,7 +3,7 @@
 Two Claude Code skills that together let you go from an unfamiliar webapp codebase to an executed, screenshotted, git-tracked dogfood run — while staying within one or two sessions.
 
 - **`webapp-test-plan`** — generates `dogfood-output/test-plan.md` by reading the codebase
-- **`webapp-test-run`** — executes the plan with `agent-browser`, producing `dogfood-output/report-YYYY-MM-DD.md` and a dated git branch
+- **`webapp-test-run`** — executes the plan with `agent-browser`, producing `dogfood-output/report-YYYY-MM-DD.md` and a commit on the current branch
 
 These are designed to be used independently or as a pipeline. They were distilled from a real 2-session dogfood run of a Next.js manufacturing quote/order platform (staging, ~76 test steps, 9 workflows).
 
@@ -29,10 +29,10 @@ Requirements:
 
 ```
             ┌──────────────────────┐       ┌──────────────────────┐
-codebase ─▶│   webapp-test-plan   │──────▶│   webapp-test-run    │──▶ dated branch
-            │                      │       │                      │    + report
-            │ • routes             │       │ • 2-actor sessions   │    + screenshots
-            │ • enums              │       │ • per-step screenshots│
+codebase ─▶│   webapp-test-plan   │──────▶│   webapp-test-run    │──▶ commit on
+            │                      │       │                      │    current branch
+            │ • routes             │       │ • 2-actor sessions   │    + report
+            │ • enums              │       │ • per-step screenshots│    + screenshots
             │ • workflows          │       │ • issue tracking     │
             │ • fixtures           │       │ • gotcha references  │
             └──────────────────────┘       └──────────────────────┘
@@ -55,7 +55,7 @@ Walks the codebase and drafts a full manual test plan organized by workflow. The
 1. **前提** — URLs, actors, rationale
 2. **実装分析サマリ** — 4-8 bullet findings
 3. **アップロード準備** — fixtures (needed / to-create / reuse)
-4. **スクショ撮影ルール** — naming convention (`test-<N>-<M>.png`)
+4. **スクショファイル名規約** — naming convention (`test-<N>-<M>.png`)
 5. **テスト 1..N** — per-workflow tables: `# | 操作者 | 操作 | 確認ポイント | スクショ`
 6. **実行順序** — numbered execution plan
 7. **ステータス一覧（参考）** — enum → label mappings
@@ -81,7 +81,7 @@ The skill will ask for missing info (app URL, output dir) rather than guess.
 
 ### What it does
 
-Runs a plan through `agent-browser`, taking screenshots per step, writing the report as it goes, and committing results to a dated branch.
+Runs a plan through `agent-browser`, taking screenshots per step, writing the report as it goes, and committing results on the current branch.
 
 ### Output shape
 
@@ -92,7 +92,7 @@ Runs a plan through `agent-browser`, taking screenshots per step, writing the re
    - 実行サマリ (run overview)
    - Issues (critical/high/medium/low, appended as found)
    - テスト実行状況 (inline sections per step with embedded screenshots — **no large tables**)
-3. `test/dogfood-YYYY-MM-DD` git branch with all of the above committed
+3. A commit on the current branch with all of the above included
 
 ### What it handles
 
@@ -140,10 +140,10 @@ The skills bake in lessons from the source run:
 | Always use two browser sessions for role-based apps | `webapp-test-run` SKILL.md §2 |
 | Refs renumber on any state change | gotchas.md "Ref stability" |
 | Radix dialogs need 1500-2500ms post-click wait | gotchas.md "Clickability" |
-| Don't narrate clicks — verify via `eval window.location.href` | `webapp-test-run` SKILL.md "Verifying navigation" |
+| Don't narrate clicks — verify via `eval window.location.href` | `webapp-test-run` SKILL.md §3 step 4 |
 | Inline report sections beat wide tables | `webapp-test-run` SKILL.md §"Formatting the report" |
-| Commit to a dated branch, not a generic feature branch | `webapp-test-run` SKILL.md §6 |
-| Don't include unrelated file changes in the commit | `webapp-test-run` SKILL.md §6 |
+| Commit on the current branch, not a generated dated branch | `webapp-test-run` SKILL.md §5 |
+| Don't include unrelated file changes in the commit | `webapp-test-run` SKILL.md §5 |
 | Don't burn 30 tool calls on one step — mark as `⏸ blocked` | gotchas.md "When to give up" |
 | Fix app code only when the fix is independently justifiable | `webapp-test-run` SKILL.md "Guidance" |
 
