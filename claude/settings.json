@@ -5,6 +5,8 @@
     "CLAUDE_CODE_NO_FLICKER": "0"
   },
   "includeGitInstructions": true,
+  "model": "claude-opus-4-8",
+  "effortLevel": "xhigh",
   "permissions": {
     "defaultMode": "auto",
     "allow": [
