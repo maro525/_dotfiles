@@ -80,56 +80,73 @@ sync_common::show_header() {
   echo ""
 }
 
+# Terminal-aware UI width shared by the file header and diff box.
+# Echoes a width clamped to [40, 100].
+sync_common::ui_width() {
+  local width
+  width=$(tput cols 2>/dev/null || echo 80)
+  if [[ $width -gt 100 ]]; then
+    width=100
+  elif [[ $width -lt 40 ]]; then
+    width=40
+  fi
+  echo "$width"
+}
+
 # Print a diff between two files inside a visual box.
-# Args: src, dst, [max_lines (default: 40)].
+# Sign convention is FIXED regardless of which side is missing:
+#   '-' (red)   = repo side
+#   '+' (green) = HOME side
+# A missing side is diffed against /dev/null, so a file that exists only in
+# HOME renders as all '+', and one that exists only in repo as all '-'.
+# Renders via delta when available (syntax highlighting, line numbers),
+# falling back to colordiff, then plain diff.
+# Args: src (HOME path), dst (repo path), [max_lines (default: 40)].
 sync_common::print_diff_box() {
   local src="$1"
   local dst="$2"
   local max_lines="${3:-40}"
 
-  local src_label="HOME"
-  local dst_label="repo"
-
-  # Dynamic terminal width (default 62 if tput unavailable)
   local width
-  width=$(tput cols 2>/dev/null || echo 80)
-  if [[ $width -gt 62 ]]; then
-    width=62
-  elif [[ $width -lt 40 ]]; then
-    width=40
-  fi
+  width=$(sync_common::ui_width)
 
   # Build dash line efficiently — no seq, no multibyte issues
   local dashes
   printf -v dashes '%*s' $((width - 2)) ''
   dashes=${dashes// /─}
 
-  # Use /dev/null on the missing side so diff -u emits the present file as a
-  # single +block — the right preview for "new file" syncs in either direction.
-  local left="$dst"
-  local right="$src"
-  local title="Diff: $dst_label → $src_label"
-  if [[ ! -f "$src" && -f "$dst" ]]; then
-    left=/dev/null
-    right="$dst"
-    title="New file content (from $dst_label — not yet in $src_label)"
-  elif [[ ! -f "$dst" && -f "$src" ]]; then
-    left=/dev/null
-    right="$src"
-    title="New file content (from $src_label — not yet in $dst_label)"
-  fi
+  # Fixed orientation: repo is always the '-' side, HOME always the '+' side.
+  local repo_side="$dst"
+  local home_side="$src"
+  [[ -f "$repo_side" ]] || repo_side=/dev/null
+  [[ -f "$home_side" ]] || home_side=/dev/null
+
+  # Keep the real filename in the labels so delta can pick the syntax
+  # highlighting language from the extension.
+  local name
+  name=$(basename "${dst:-$src}")
+  local repo_label="repo/$name"
+  local home_label="HOME/$name"
 
   echo ""
   echo "┌${dashes}┐"
-  echo "│ $title"
+  printf '│ Diff: \e[31m− repo\e[0m / \e[32m+ HOME\e[0m\n'
   echo "├${dashes}┤"
 
   local diff_output
-  if command -v colordiff &>/dev/null; then
-    diff_output=$(diff -u "$left" "$right" 2>/dev/null | colordiff) || true
+  if command -v delta &>/dev/null; then
+    diff_output=$(diff -u --label "$repo_label" --label "$home_label" "$repo_side" "$home_side" 2>/dev/null \
+      | delta --paging=never --keep-plus-minus-markers --file-style=omit \
+              --hunk-header-style='line-number' --hunk-header-decoration-style=omit \
+              --width=$((width - 2))) || true
+  elif command -v colordiff &>/dev/null; then
+    diff_output=$(diff -u --label "$repo_label" --label "$home_label" "$repo_side" "$home_side" 2>/dev/null | colordiff) || true
   else
-    diff_output=$(diff -u "$left" "$right" 2>/dev/null) || true
+    diff_output=$(diff -u --label "$repo_label" --label "$home_label" "$repo_side" "$home_side" 2>/dev/null) || true
   fi
+
+  # delta emits a leading blank line — drop it so the box stays tight.
+  diff_output="${diff_output#$'\n'}"
 
   # P2: defensive check for empty diff_output
   if [[ -n "$diff_output" ]]; then
@@ -156,12 +173,7 @@ sync_common::print_file_header() {
   local rel_path="$1"
 
   local width
-  width=$(tput cols 2>/dev/null || echo 80)
-  if [[ $width -gt 62 ]]; then
-    width=62
-  elif [[ $width -lt 40 ]]; then
-    width=40
-  fi
+  width=$(sync_common::ui_width)
 
   local equals
   printf -v equals '%*s' "$width" ''
