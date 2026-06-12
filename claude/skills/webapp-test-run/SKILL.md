@@ -72,6 +72,18 @@ ls -t dogfood-output/report-*.md 2>/dev/null | head -1
 
   Then pre-populate `## テスト実行状況` with every step from `test-plan.md`, each as a `- [ ]` task-list item with 操作者 / 操作 / 確認ポイント filled in verbatim and 結果 left blank. This makes the report show the full intended scope upfront — execution then just flips boxes and fills in 結果.
 
+### 1.3 Pre-run data grooming (when screenshots are reused for docs/help)
+
+Screenshots from a run are often reused beyond the QA report — as help-center / documentation images (plans mark these steps, e.g. 「help用」). A screenshot full of junk data (`aaaa...` boundary names, bulk-import fill items, a trash with 1500 entries) is unusable for docs and forces a re-shoot, defeating the reuse.
+
+**If the plan designates the workspace as groomable** (its data may be freely deleted — check the plan's 前提 section; never assume for shared/production-like environments), groom it before executing:
+
+1. Delete leftovers from prior runs: bulk-import fills, boundary-test names, items the plan doesn't reference.
+2. Empty the trash so trash-screen shots show only what this run deletes.
+3. Keep/restore realistic demo data the plan relies on for presentable screenshots.
+
+This costs a few minutes upfront and makes **every** screenshot in the run doc-ready by default.
+
 ## 2. Authenticate each actor
 
 Standard pattern:
@@ -233,9 +245,10 @@ Static issues (typos, layout) need one annotated screenshot. Interactive issues 
 After all tests (or at a natural stopping point):
 
 1. Update the report's `## テスト実行状況` section. For **every** step, copy the test item from the plan (操作者 / 操作 / 確認ポイント) verbatim and add the result (✅ / ⏸ / ❌ + what actually happened) plus the screenshot. Each step is a GitHub task-list item — `- [x]` for executed steps (regardless of pass/fail), `- [ ]` for not-yet-run steps. The report must be self-contained — never collapse a step to just a status line.
-2. **Clean up test data (optional, recommended for shared environments).** Anything you created during the run — orders, users, uploaded files — is now real data in the DB. Remove it before closing out:
+2. **Clean up test data.** Anything you created during the run — orders, users, uploaded files — is now real data in the DB. Remove it before closing out:
    - As the privileged actor, delete the records you created. Use the entity IDs you stored in §3.
    - If the app has a "Reset test data" admin action or seed script, prefer that over manual deletion.
+   - **Mandatory for groomable workspaces** (§1.3): delete this run's artifacts (bulk imports, boundary-name items, junk values) and empty the trash, leaving the workspace presentable. The goal is that the *next* run's screenshots are doc-ready without extra grooming — cleanup at the end is what makes §1.3 cheap.
    - For ephemeral local environments where DB reseeding is cheap, you can skip this and re-seed before the next run instead.
    - **Skip** cleanup if a failing test left data you need to inspect afterward — note this in the commit message so the next run knows the DB isn't clean.
 3. Close sessions: `agent-browser --session X close` for each.
@@ -306,6 +319,7 @@ At the start of the run (§1 Initialize), after copying the template, walk throu
 - **Store entity IDs in memory** during the run — when you create an Order with ID `abc-123`, you'll need it for admin view, reports, and subsequent tests.
 - **Verify each step via state, not via click success**. `✓ Done` from `click` means the click fired, not that the intended effect happened.
 - **Screenshot at the verification point**, not before the action.
+- **Doc-reuse shots get doc-quality framing**: for steps the plan marks for docs/help reuse, follow the plan's presentation conditions (e.g. expanded sidebar, realistic data in frame, no junk rows) — these screenshots ship to end users, not just the QA report.
 - **Scope snapshots and screenshots by default** — pass a selector (`snapshot -s "<sel>"`, `screenshot "<sel>" <path>`). Full-page only when the test is genuinely about the whole page (404, navigation, full layout). See §3.1.
 - **Prefer `wait --load networkidle` for navigations**, fixed `wait NNN` for animations and state toggles.
 - **When stuck, inspect DOM**: `agent-browser eval "(() => { const el = document.querySelector('...'); return {tag: el.tagName, attrs: [...el.attributes].map(a => a.name+'='+a.value)}; })()"`.
