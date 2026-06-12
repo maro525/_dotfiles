@@ -1,14 +1,10 @@
 {
   "$schema": "https://json.schemastore.org/claude-code-settings.json",
   "env": {
-
     "CLAUDE_CODE_NO_FLICKER": "0"
   },
   "includeGitInstructions": true,
-  "model": "claude-opus-4-8",
-  "effortLevel": "xhigh",
   "permissions": {
-    "defaultMode": "auto",
     "allow": [
       "Edit",
       "Read",
@@ -97,7 +93,7 @@
       "mcp__figma-desktop__get_design_context",
       "mcp__figma-desktop__get_screenshot",
       "mcp__github__list_commits",
-      "mcp__linear*",
+      "mcp__linear-server",
       "mcp__linear-server__create_comment",
       "mcp__linear-server__create_issue",
       "mcp__linear-server__get_issue",
@@ -157,8 +153,10 @@
     "ask": [
       "Bash(git rebase:*)",
       "Bash(rm:*)"
-    ]
+    ],
+    "defaultMode": "auto"
   },
+  "model": "claude-fable-5[1m]",
   "hooks": {
     "PostToolUse": [
       {
@@ -206,16 +204,20 @@
       }
     ]
   },
+  "enabledPlugins": {},
+  "effortLevel": "xhigh",
+  "skipDangerousModePermissionPrompt": true,
+  "skipWorkflowUsageWarning": true,
+  "verbose": true,
+  "teammateMode": "in-process",
+  "remoteControlAtStartup": true,
+  "agentPushNotifEnabled": true,
+  "skipAutoPermissionPrompt": true,
   "thinking": {
     "type": "adaptive"
   },
   "output_config": {
     "effort": "xhigh"
   },
-  "display": "summarized",
-  "skipDangerousModePermissionPrompt": true,
-  "teammateMode": "in-process",
-  "verbose": true,
-  "remoteControlAtStartup": true,
-  "agentPushNotifEnabled": true
+  "display": "summarized"
 }
