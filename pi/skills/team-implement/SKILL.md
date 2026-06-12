@@ -28,6 +28,14 @@ $ARGUMENTS: "{task description} --tier={S|M|L} --task-file={TASK_FILE} --linear-
 
 **[MUST]** Linear に実装開始コメントを投稿（ステータス → In Progress）。
 
+### ブランチ確認
+
+```bash
+git branch --show-current
+```
+
+**保護ブランチ `release` / `staging` / `main`（master 含む）への直接コミットは、ユーザーの明示的な許可がない限り禁止。** 保護ブランチ上にいる場合は、実装開始前に必ず feature ブランチを作成する。保護ブランチへの反映は deploy フェーズの PR / MR（GitHub → `gh` / GitLab → `glab`）経由で行う。
+
 ---
 
 ## IMPLEMENTATION
