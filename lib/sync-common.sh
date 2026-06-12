@@ -388,7 +388,7 @@ sync_common::sync_directory() {
     while IFS= read -r -d '' src_file; do
       rel_paths+=("${src_file#$src_dir/}")
     done < <(find "$src_dir" \
-      -name 'node_modules' -prune -o \
+      \( -name 'node_modules' -o -name '.git' \) -prune -o \
       -type f -name "$pattern" ! -name '*.lock' -print0 \
       2>/dev/null)
   fi
@@ -396,7 +396,7 @@ sync_common::sync_directory() {
     while IFS= read -r -d '' dst_file; do
       rel_paths+=("${dst_file#$dst_dir/}")
     done < <(find "$dst_dir" \
-      -name 'node_modules' -prune -o \
+      \( -name 'node_modules' -o -name '.git' \) -prune -o \
       -type f -name "$pattern" ! -name '*.lock' -print0 \
       2>/dev/null)
   fi
