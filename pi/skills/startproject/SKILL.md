@@ -92,7 +92,7 @@ subagent {
 3. PI.md / AGENTS.md に Current Project セクションを追加
    - Goal / Key files / Architecture / Decisions
 
-4. **[MUST]** Linear に計画完了コメントを投稿（MCP または CLI。GitHub → `gh` / GitLab → `glab`）
+4. **[MUST]** Linear に計画完了コメントを投稿（MCP または gh CLI）
 
 5. 以下の基準で承認フローを自己判断
 
