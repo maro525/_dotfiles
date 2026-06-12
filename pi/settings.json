@@ -1,9 +1,11 @@
 {
+  "defaultModel": "gemma3:4b",
+  "defaultProvider": "ollama",
+  "defaultThinkingLevel": "high",
+  "hideThinkingBlock": true,
+  "lastChangelogVersion": "0.78.0",
   "packages": [
-    "npm:pi-subagents"
-  ],
-  "lastChangelogVersion": "0.71.1",
-  "defaultProvider": "fireworks",
-  "defaultModel": "accounts/fireworks/models/qwen3p6-plus",
-  "hideThinkingBlock": true
+    "npm:pi-subagents",
+    "npm:@ollama/pi-web-search"
+  ]
 }
