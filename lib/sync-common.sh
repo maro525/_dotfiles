@@ -2,7 +2,7 @@
 # Shared sync helpers for sync-pi.sh / sync-claude.sh / sync-opencode.sh.
 #
 # Provides:
-#   - Interactive diff + a/p/s/d/q prompt for syncing HOME <-> repo
+#   - Interactive diff + a/p/m/s/d/q prompt for syncing HOME <-> repo
 #   - Optional non-interactive (auto-copy HOME -> repo) mode via -n
 #   - File / directory / rsync-based sync helpers
 #
@@ -13,7 +13,7 @@
 #
 # Public globals (set by helpers, read by callers):
 #   INTERACTIVE     1 = interactive (default), 0 = non-interactive
-#   PROMPT_ACTION   last interactive_prompt result (a/p/s/d/q)
+#   PROMPT_ACTION   last interactive_prompt result (a/p/m/s/d/q)
 #   DIFF_RESULT     last show_diff result (0=same, 1=different, 2=error)
 
 # Guard against double-sourcing.
@@ -217,7 +217,8 @@ sync_common::show_diff() {
 
 # Interactive prompt for sync decision.
 # Args: rel_path, [src], [dst].
-# Sets: PROMPT_ACTION (a=accept HOME→repo, p=push repo→HOME, s=skip, d=diff, q=quit).
+# Sets: PROMPT_ACTION (a=accept HOME→repo, p=push repo→HOME, m=merge both,
+#   s=skip, d=diff, q=quit).
 sync_common::interactive_prompt() {
   local rel_path="$1"
   local src="${2:-}"
@@ -249,11 +250,12 @@ sync_common::interactive_prompt() {
     echo "Actions:"
     echo "  (a)ccept HOME   - Copy HOME → repo"
     echo "  (p)ush to HOME  - Copy repo → HOME"
+    echo "  (m)erge         - 3-way merge HOME + repo (base: last commit)"
     echo "  (s)kip          - Keep both versions unchanged"
     echo "  (d)iff          - Show diff again"
     echo "  (q)uit          - Stop sync process"
     echo ""
-    read -rp "Choose action [a/p/s/d/q]: " choice < /dev/tty || choice=""
+    read -rp "Choose action [a/p/m/s/d/q]: " choice < /dev/tty || choice=""
 
     # Trim leading/trailing whitespace
     choice="$(echo "$choice" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
@@ -266,6 +268,10 @@ sync_common::interactive_prompt() {
       p|P)
         echo "  → Accepted: p (copy repo → HOME)"
         PROMPT_ACTION="p"
+        ;;
+      m|M)
+        echo "  → Accepted: m (merge HOME + repo)"
+        PROMPT_ACTION="m"
         ;;
       s|S)
         echo "  → Accepted: s (skip)"
@@ -284,10 +290,77 @@ sync_common::interactive_prompt() {
         PROMPT_ACTION="q"
         ;;
       *)
-        echo "  Invalid choice. Please enter a, p, s, d, or q."
+        echo "  Invalid choice. Please enter a, p, m, s, d, or q."
         ;;
     esac
   done
+}
+
+# 3-way merge of HOME and repo versions, using the last committed repo
+# version (git HEAD) as the merge base. Non-overlapping changes from both
+# sides merge automatically; overlapping changes open $EDITOR with conflict
+# markers. On success the merged result is written to BOTH sides so they
+# end up identical. Nothing is written while conflict markers remain.
+# Args: src (HOME path), dst (repo path), rel_path.
+# Returns 0 if merged and written, 1 if aborted (nothing written).
+sync_common::merge_file() {
+  local src="$1"
+  local dst="$2"
+  local rel_path="$3"
+
+  local repo_root
+  if ! repo_root=$(git -C "$(dirname "$dst")" rev-parse --show-toplevel 2>/dev/null); then
+    echo "  → Cannot merge: repo side is not inside a git repository"
+    return 1
+  fi
+  local repo_rel="${dst#"$repo_root"/}"
+
+  local base merged
+  base=$(mktemp)
+  merged=$(mktemp)
+  local rc=1
+
+  while true; do
+    if ! git -C "$repo_root" show "HEAD:$repo_rel" > "$base" 2>/dev/null; then
+      # Never committed — no ancestor, so every differing hunk conflicts.
+      : > "$base"
+      echo "  (no committed base version — differing hunks will all conflict)"
+    fi
+
+    cp "$src" "$merged"
+    local conflicts=0
+    git merge-file -L "HOME/$rel_path" -L "base/$rel_path" -L "repo/$rel_path" \
+      "$merged" "$base" "$dst" || conflicts=$?
+
+    # git merge-file exits negative (>127 in shell) on error, otherwise
+    # with the number of conflicts.
+    if [[ $conflicts -gt 127 ]]; then
+      echo "  → git merge-file failed — merge aborted, nothing written"
+      break
+    fi
+
+    if [[ $conflicts -gt 0 ]]; then
+      echo "  → $conflicts conflicting hunk(s) — opening ${EDITOR:-vi} to resolve"
+      if { : < /dev/tty; } 2>/dev/null; then
+        "${EDITOR:-vi}" "$merged" < /dev/tty > /dev/tty 2>&1 || true
+      else
+        "${EDITOR:-vi}" "$merged" || true
+      fi
+      if grep -qE '^(<{7}|>{7})( |$)' "$merged"; then
+        echo "  → Conflict markers still present — merge aborted, nothing written"
+        break
+      fi
+    fi
+
+    cp "$merged" "$src"
+    cp "$merged" "$dst"
+    echo "  → Merged: wrote result to both HOME and repo ($rel_path)"
+    rc=0
+    break
+  done
+
+  rm -f "$base" "$merged"
+  return $rc
 }
 
 # Sync a single file (HOME <-> repo, direction chosen interactively).
@@ -334,6 +407,17 @@ sync_common::sync_file() {
           mkdir -p "$(dirname "$src")"
           cp -v "$dst" "$src"
           return 0
+          ;;
+        m)
+          if [[ $only_in_home -eq 1 || $only_in_repo -eq 1 ]]; then
+            echo "  → Cannot merge: file exists on only one side — use (a) or (p)"
+            continue
+          fi
+          if sync_common::merge_file "$src" "$dst" "$rel_path"; then
+            return 0
+          fi
+          # Merge aborted — re-prompt so the user can pick another action.
+          continue
           ;;
         s)
           if [[ $only_in_home -eq 1 ]]; then
