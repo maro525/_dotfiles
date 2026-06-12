@@ -35,6 +35,12 @@ $ARGUMENTS の形式: "{task description}"
 | Gate 1 | startproject の計画提示後 | ユーザー承認を待つ |
 | Gate 3 | team-review の FAIL 時 | ユーザーに報告し判断を待つ |
 
+## Git 共通ルール（全 STEP）
+
+- ホスティングに応じて CLI を使い分ける: GitLab → `glab` / GitHub → `gh`（`git remote get-url origin` で判定）
+- **保護ブランチ `release` / `staging` / `main`（master 含む）への直接コミット・push は、ユーザーの明示的な許可がない限り禁止**。反映は必ず PR / MR 経由
+- 保護ブランチ上で作業を始める場合は feature ブランチを作成してから実装する（tier=XS も同様）
+
 ---
 
 ## STEP 0: CLASSIFY
@@ -155,7 +161,7 @@ startproject 内で質問が発生した場合はユーザーが回答する。
 
 | tier | 動作 |
 |---|---|
-| XS | ブランチ不要。Claude が直接実装 |
+| XS | Claude が直接実装。ただし保護ブランチ（release/staging/main）上にいる場合は feature ブランチを作成 |
 | S | feature ブランチ。Claude が直接実装 |
 | M | feature ブランチ。Claude 直接 or 1-2 サブエージェント |
 | L | feature ブランチ。フルチーム（モジュール単位オーナーシップ） |
