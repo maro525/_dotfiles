@@ -1,5 +1,6 @@
 {
   "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "model": "best",
   "env": {
     "CLAUDE_CODE_NO_FLICKER": "0"
   },
@@ -156,7 +157,6 @@
     ],
     "defaultMode": "auto"
   },
-  "model": "claude-fable-5[1m]",
   "hooks": {
     "PostToolUse": [
       {
@@ -213,11 +213,6 @@
   "remoteControlAtStartup": true,
   "agentPushNotifEnabled": true,
   "skipAutoPermissionPrompt": true,
-  "thinking": {
-    "type": "adaptive"
-  },
-  "output_config": {
-    "effort": "xhigh"
-  },
-  "display": "summarized"
+  "fallbackModel": ["opus", "sonnet"],
+  "showThinkingSummaries": true
 }
