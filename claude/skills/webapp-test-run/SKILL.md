@@ -114,7 +114,7 @@ For every unchecked step:
 2. **Perform the action** — `click @eN` / `fill @eN "..."` / `upload @eN path1 path2` / `scroll down N`.
 3. **Wait** — after destructive or state-changing actions, `wait 1500` to 2500ms. After navigation, `wait --load networkidle`.
 4. **Verify** — `snapshot -i | grep <expected-label>` or `eval "window.location.href"`. Never assume.
-5. **Screenshot** — `screenshot dogfood-output/screenshots/test-<N>-<M>.png` using the plan's name. Use `--annotate` only when you need labels in the image.
+5. **Highlight the operation target, then screenshot** — before capturing, draw a colored box around the element the step acts on (the button/field/cell the reader should look at), then `screenshot dogfood-output/screenshots/test-<N>-<M>.png` using the plan's name. This is **mandatory by default** so screenshots double as help-center material — see §3.3. Use `--annotate` (numbered labels on *all* interactive elements) only when you specifically need that legend; it is not a substitute for the single-target highlight box.
 
 **Batch independent commands with `&&`** to save tool calls:
 
@@ -190,6 +190,41 @@ A visibly passing test can still hide bugs: failed fetches, uncaught promise rej
 **Ignore dev-only noise** (add to your filter as you find them): React DevTools nags, Fast Refresh / HMR logs, Next.js telemetry, source-map fetch warnings, hydration mismatch warnings that disappear on reload.
 
 **Why per-test, not per-step**: per-step is too noisy and burns tool calls; end-of-run is too coarse to localize which test introduced the error. Per-test gives you a usable bisection.
+
+### 3.3 Highlight the operation target before every screenshot (help-material convention)
+
+Dogfood screenshots are reused directly as help-center / onboarding material, so **every step screenshot must visually point at the element the step acts on** — the button being clicked, the field being filled, the toggle being switched, the cell whose value changed. A reader skimming the help page should see at a glance "this is the thing you interact with" without reading the caption.
+
+**Default highlight style**: a **red box, `#E94F4F`, 2px**, drawn *around* the target (not filling it). Projects may override the color/width via their plan's screenshot rules — if `test-plan*.md` specifies a highlight convention (e.g. nanco's `#E94F4F` 2px), follow that; otherwise use this default.
+
+**How** — inject an absolutely-positioned overlay box via `eval`, screenshot, then remove it. An overlay (vs. setting `outline`/`border` on the element itself) never shifts layout and is never clipped by an `overflow:hidden` ancestor:
+
+```bash
+# 1. Highlight the target (replace SELECTOR with a stable selector for the element the step acts on)
+agent-browser --session s eval "(() => {
+  const el = document.querySelector('SELECTOR');
+  if (!el) return 'not found';
+  el.scrollIntoView({block:'center', inline:'center'});
+  const r = el.getBoundingClientRect();
+  const box = document.createElement('div');
+  box.id = '__hl';
+  box.style.cssText = 'position:fixed;left:'+(r.left-3)+'px;top:'+(r.top-3)+'px;width:'+(r.width+6)+'px;height:'+(r.height+6)+'px;border:2px solid #E94F4F;border-radius:6px;pointer-events:none;z-index:2147483647';
+  document.body.appendChild(box);
+  return 'highlighted';
+})()"
+
+# 2. Capture (scope to the relevant area per §3.1 — the box rides along inside it)
+agent-browser --session s screenshot "[role=dialog]" dogfood-output/screenshots/test-1-2.png
+
+# 3. Remove the box so it doesn't leak into the next step's snapshot/screenshot
+agent-browser --session s eval "document.getElementById('__hl')?.remove()"
+```
+
+Notes:
+- **Pick the selector for the *target of the action*, not the whole container.** If the step is "click 作成", box the 作成 button — `button:has-text('作成')` or the `@eN` element's selector — not the toolbar.
+- **Multiple targets in one shot** (e.g. "両方のトグルを ON にする", "集計セル4個を強調"): loop `querySelectorAll`/multiple selectors and append one box per element, all with id-prefixed ids (`__hl0`, `__hl1`, …), then remove them all.
+- **Always remove the box(es) before the next `snapshot`/action** — a stray overlay with `pointer-events:none` won't block clicks but will appear in later screenshots and pollute the accessibility tree.
+- Hover/drag-handle states (`:hover` highlights, dnd-kit placeholders) can't be driven reliably — for those, the box around the handle/row is the substitute for the real hover affordance.
 
 ## Automation gotchas (consult during §3 Execute)
 
@@ -319,6 +354,7 @@ At the start of the run (§1 Initialize), after copying the template, walk throu
 - **Store entity IDs in memory** during the run — when you create an Order with ID `abc-123`, you'll need it for admin view, reports, and subsequent tests.
 - **Verify each step via state, not via click success**. `✓ Done` from `click` means the click fired, not that the intended effect happened.
 - **Screenshot at the verification point**, not before the action.
+- **Highlight the operation target before every screenshot** (red box `#E94F4F` 2px by default, or the plan's convention) so shots double as help-center material. See §3.3.
 - **Doc-reuse shots get doc-quality framing**: for steps the plan marks for docs/help reuse, follow the plan's presentation conditions (e.g. expanded sidebar, realistic data in frame, no junk rows) — these screenshots ship to end users, not just the QA report.
 - **Scope snapshots and screenshots by default** — pass a selector (`snapshot -s "<sel>"`, `screenshot "<sel>" <path>`). Full-page only when the test is genuinely about the whole page (404, navigation, full layout). See §3.1.
 - **Prefer `wait --load networkidle` for navigations**, fixed `wait NNN` for animations and state toggles.
