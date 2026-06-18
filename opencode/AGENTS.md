@@ -1,18 +1,18 @@
-# OpenCode Global Instructions
+# OpenCode Agent Instructions
 
-Claude Code + OpenCode CLI + Gemini CLI で並列開発を加速する。
+OpenCode CLI で開発を加速するためのエージェント仕様（外部リサーチ用に Gemini CLI を補助的に併用）。
 
 ## DOCUMENTATION STRUCTURE
 
 | Path | Purpose |
 |------|---------|
 | `.opencode/commands/` | orchestrate / startproject / team-implement / team-review / deploy |
-| `.opencode/agents/`   | 各フェーズ用 subagent 定義 |
-| `.claude/docs/decisions/task-{LINEAR_ID}-{feature}.md` | 統合タスクファイル (SSoT) |
+| `.opencode/agents/` | 各フェーズ用 subagent 定義 |
+| `.claude/docs/decisions/task-{LINEAR_ID}-{feature}.md` | 統合タスクファイル (SSoT) — 全 CLI で共有 |
 | `.claude/docs/libraries/` | ライブラリ制約 |
 | `.claude/logs/` | CLI 入出力ログ |
 
-Claude Code と同じ `.claude/docs/` ツリーを共有する（両ツールで同じタスクファイルを参照）。
+`.claude/docs/` ツリーは全 CLI で共有する（同じタスクファイルを参照）。
 
 ## WORKFLOW COMMON RULES
 
@@ -37,6 +37,14 @@ Claude Code と同じ `.claude/docs/` ツリーを共有する（両ツールで
 
 ## ROUTING NOTES
 
-- Git / Linear MCP は各フェーズ内で直接実行（Claude Code 版の `context: fork` 相当）
+- Git / Linear MCP は各フェーズ内で直接実行
 - 外部リサーチは Gemini CLI（`gemini -p "..." 2>/dev/null`）
-- 設計相談は OpenCode CLI 自身が対応するか、並列セッションを起動
+- 設計相談は OpenCode 自身で対応するか、`task` tool（subagent）で並列起動。モデル多様性が必要な場合は Gemini CLI を併用
+
+## OpenCode 仕様メモ
+
+- 配置先: `~/.config/opencode/` 配下（`AGENTS.md` / `agents/` / `commands/` / `skills/`）
+- **自動スキル提案なし**: UserPromptSubmit hook 相当が無いため、`/orchestrate` などスキルは明示呼び出し必須
+- **スキル間連鎖**: `@agent-name` mention で起動。コマンド同士の直接呼び出しは不可
+- **サブエージェント起動**: `task` tool を使用
+- **`context: fork` 代替**: `mode: subagent` + `subtask: true`（親子間のトークン共有挙動は若干異なる）
