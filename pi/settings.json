@@ -1,11 +1,12 @@
 {
-  "defaultModel": "gemma3:4b",
+  "defaultModel": "gemma4:26b",
   "defaultProvider": "ollama",
   "defaultThinkingLevel": "high",
   "hideThinkingBlock": true,
-  "lastChangelogVersion": "0.78.0",
+  "lastChangelogVersion": "0.79.4",
   "packages": [
     "npm:pi-subagents",
     "npm:@ollama/pi-web-search"
-  ]
+  ],
+  "theme": "dark"
 }
