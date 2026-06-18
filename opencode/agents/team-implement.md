@@ -4,6 +4,15 @@ mode: subagent
 temperature: 0.2
 permission:
   edit: allow
+  bash:
+    "*": ask
+    "git *": allow
+    "rg *": allow
+    "npm *": allow
+    "uv *": allow
+    "pytest *": allow
+    "ruff *": allow
+    "git push --force*": deny
 ---
 
 # team-implement
