@@ -4,6 +4,13 @@ mode: subagent
 temperature: 0.2
 permission:
   edit: allow
+  bash:
+    "*": ask
+    "git log *": allow
+    "git show *": allow
+    "git diff *": allow
+    "rg *": allow
+    "gemini *": allow
 ---
 
 # startproject

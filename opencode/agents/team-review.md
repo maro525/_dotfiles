@@ -4,6 +4,13 @@ mode: subagent
 temperature: 0.1
 permission:
   edit: allow
+  bash:
+    "*": ask
+    "git *": allow
+    "rg *": allow
+    "pytest *": allow
+    "npm test*": allow
+    "ruff *": allow
 ---
 
 # team-review
