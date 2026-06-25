@@ -1,1 +1,5 @@
 .claude/*
+
+# Local secret overrides — never commit these.
+bash/.bashrc.local
+*.local
