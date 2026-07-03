@@ -3,6 +3,7 @@ name: team-review
 description: Review phase — 4 parallel reviewers (Claude / OpenCode / Security / Simplify), browser check or test execution. Called by /orchestrate with tier, task-file, linear-id.
 context: fork
 agent: Plan
+model: claude-opus-4-8
 allowed-tools: Read, Write, Edit, Bash, Grep, Glob, Agent, Skill, AskUserQuestion, TodoWrite, mcp__linear-server__save_comment, mcp__linear-server__get_issue, mcp__agent-browser__navigate, mcp__agent-browser__screenshot, mcp__agent-browser__click, mcp__agent-browser__type
 ---
 
