@@ -3,6 +3,7 @@ name: deploy
 description: Deploy phase — push feature branch, create PR, update Linear. Called by /orchestrate with tier, task-file, linear-id.
 context: fork
 agent: Bash
+model: haiku
 allowed-tools: Read, Write, Edit, Bash, Grep, Glob, AskUserQuestion, TodoWrite, mcp__linear-server__save_comment, mcp__linear-server__get_issue, mcp__linear-server__save_issue, mcp__linear-server__list_issue_statuses, mcp__agent-browser__navigate, mcp__agent-browser__screenshot, mcp__agent-browser__click, mcp__agent-browser__type
 ---
 
