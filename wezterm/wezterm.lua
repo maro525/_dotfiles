@@ -32,7 +32,7 @@ config.font = wezterm.font(
 config.harfbuzz_features = { 'calt=0', 'clig=0', 'liga=0' }
 config.text_background_opacity = 0.95
 config.font_size = 9
-config.cell_width = 1.1
+config.cell_width = 0.95
 config.line_height = 1.1
 config.use_cap_height_to_scale_fallback_fonts = true
 
