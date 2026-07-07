@@ -2,7 +2,7 @@
 # Shared sync helpers for sync-pi.sh / sync-claude.sh / sync-opencode.sh.
 #
 # Provides:
-#   - Interactive diff + a/p/m/s/d/q prompt for syncing HOME <-> repo
+#   - Interactive diff + a/p/h/H/s/d/q prompt for syncing HOME <-> repo
 #   - Optional non-interactive (auto-copy HOME -> repo) mode via -n
 #   - File / directory / rsync-based sync helpers
 #
@@ -13,7 +13,7 @@
 #
 # Public globals (set by helpers, read by callers):
 #   INTERACTIVE     1 = interactive (default), 0 = non-interactive
-#   PROMPT_ACTION   last interactive_prompt result (a/p/m/s/d/q)
+#   PROMPT_ACTION   last interactive_prompt result (a/p/h/H/s/q)
 #   DIFF_RESULT     last show_diff result (0=same, 1=different, 2=error)
 
 # Guard against double-sourcing.
@@ -153,7 +153,7 @@ sync_common::print_diff_box() {
     local count=0
     while IFS= read -r line; do
       if [[ $count -ge $max_lines ]]; then
-        echo "│   ... (truncated at $max_lines lines)"
+        echo "│   ... (truncated at $max_lines lines — press (d) for full diff)"
         break
       fi
       echo "│ $line"
@@ -164,6 +164,49 @@ sync_common::print_diff_box() {
   fi
 
   echo "└${dashes}┘"
+}
+
+# Show the COMPLETE diff between two files (no truncation), paged through
+# less when the terminal is interactive so long diffs are fully scrollable.
+# Same fixed orientation as print_diff_box: '-' = repo, '+' = HOME.
+# Args: src (HOME path), dst (repo path).
+sync_common::show_full_diff() {
+  local src="$1"
+  local dst="$2"
+
+  local repo_side="$dst"
+  local home_side="$src"
+  [[ -f "$repo_side" ]] || repo_side=/dev/null
+  [[ -f "$home_side" ]] || home_side=/dev/null
+
+  local name
+  name=$(basename "${dst:-$src}")
+
+  local raw
+  raw=$(diff -u --label "repo/$name" --label "HOME/$name" "$repo_side" "$home_side" 2>/dev/null) || true
+
+  if [[ -z "$raw" ]]; then
+    echo "  (no differences)"
+    return 0
+  fi
+
+  local rendered
+  if command -v delta &>/dev/null; then
+    local width
+    width=$(sync_common::ui_width)
+    rendered=$(printf '%s\n' "$raw" | delta --paging=never --keep-plus-minus-markers \
+      --hunk-header-style='line-number' --hunk-header-decoration-style=omit \
+      --width="$width") || rendered="$raw"
+  else
+    rendered="$raw"
+  fi
+
+  # Page through less when interactive; otherwise dump everything.
+  if [[ -t 1 ]] && command -v less &>/dev/null; then
+    printf '%s\n' "$rendered" | less -R
+  else
+    printf '%s\n' "$rendered"
+  fi
 }
 
 # Print a prominent header line for the file currently being prompted.
@@ -217,8 +260,9 @@ sync_common::show_diff() {
 
 # Interactive prompt for sync decision.
 # Args: rel_path, [src], [dst].
-# Sets: PROMPT_ACTION (a=accept HOME→repo, p=push repo→HOME, m=merge both,
-#   s=skip, d=diff, q=quit).
+# Sets: PROMPT_ACTION (a=all HOME→repo, h=hunks HOME→repo, p=all repo→HOME,
+#   H=hunks repo→HOME, s=skip, q=quit). The (d)iff action is handled inline
+#   (full diff in a pager) and never surfaces as a PROMPT_ACTION.
 sync_common::interactive_prompt() {
   local rel_path="$1"
   local src="${2:-}"
@@ -248,38 +292,45 @@ sync_common::interactive_prompt() {
 
     echo ""
     echo "Actions:"
-    echo "  (a)ccept HOME   - Copy HOME → repo"
-    echo "  (p)ush to HOME  - Copy repo → HOME"
-    echo "  (m)erge         - 3-way merge HOME + repo (base: last commit)"
-    echo "  (s)kip          - Keep both versions unchanged"
-    echo "  (d)iff          - Show diff again"
-    echo "  (q)uit          - Stop sync process"
+    echo "  (a) HOME → repo   - Copy all HOME → repo"
+    echo "  (h) HOME → repo   - Pick hunks HOME → repo (writes repo only)"
+    echo "  (p) repo → HOME   - Copy all repo → HOME"
+    echo "  (H) repo → HOME   - Pick hunks repo → HOME (writes HOME only)"
+    echo "  (s) skip          - Keep both versions unchanged"
+    echo "  (d) diff          - Show full diff in pager"
+    echo "  (q) quit          - Stop sync process"
     echo ""
-    read -rp "Choose action [a/p/m/s/d/q]: " choice < /dev/tty || choice=""
+    read -rp "Choose action [a/h/p/H/s/d/q]: " choice < /dev/tty || choice=""
 
     # Trim leading/trailing whitespace
     choice="$(echo "$choice" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
 
+    # h and H select opposite directions, so they must NOT be case-folded.
+    # a/p/s/d/q accept either case for convenience.
     case "$choice" in
       a|A)
-        echo "  → Accepted: a (copy HOME → repo)"
+        echo "  → Accepted: a (copy all HOME → repo)"
         PROMPT_ACTION="a"
         ;;
       p|P)
-        echo "  → Accepted: p (copy repo → HOME)"
+        echo "  → Accepted: p (copy all repo → HOME)"
         PROMPT_ACTION="p"
         ;;
-      m|M)
-        echo "  → Accepted: m (merge HOME + repo)"
-        PROMPT_ACTION="m"
+      h)
+        echo "  → Accepted: h (pick hunks HOME → repo)"
+        PROMPT_ACTION="h"
+        ;;
+      H)
+        echo "  → Accepted: H (pick hunks repo → HOME)"
+        PROMPT_ACTION="H"
         ;;
       s|S)
         echo "  → Accepted: s (skip)"
         PROMPT_ACTION="s"
         ;;
       d|D)
-        echo "  → Showing diff again"
-        PROMPT_ACTION="d"
+        # Show the complete diff in a pager, then re-render the prompt.
+        sync_common::show_full_diff "$src" "$dst"
         ;;
       q|Q)
         echo "  → Accepted: q (quit)"
@@ -290,77 +341,89 @@ sync_common::interactive_prompt() {
         PROMPT_ACTION="q"
         ;;
       *)
-        echo "  Invalid choice. Please enter a, p, m, s, d, or q."
+        echo "  Invalid choice. Please enter a, h, p, H, s, d, or q."
         ;;
     esac
   done
 }
 
-# 3-way merge of HOME and repo versions, using the last committed repo
-# version (git HEAD) as the merge base. Non-overlapping changes from both
-# sides merge automatically; overlapping changes open $EDITOR with conflict
-# markers. On success the merged result is written to BOTH sides so they
-# end up identical. Nothing is written while conflict markers remain.
-# Args: src (HOME path), dst (repo path), rel_path.
-# Returns 0 if merged and written, 1 if aborted (nothing written).
-sync_common::merge_file() {
-  local src="$1"
-  local dst="$2"
+# Selective hunk-level sync in ONE direction, borrowing git's interactive
+# hunk staging (git add -p) inside a throwaway repo. Only `to` is ever
+# written — the other side is left untouched, so the two versions are NOT
+# forced to become identical: content that exists only in `to` survives any
+# hunk you decline. Mechanism:
+#   1. commit the `to` version as the baseline (HEAD) of a temp repo
+#   2. overwrite the working tree with the `from` version
+#   3. `git add -p` lets the user stage hunks one by one
+#      (y=take this hunk, n=leave it, s=split, e=edit by hand, q=quit)
+#   4. the staged index == baseline + selected hunks == the merged result
+#   5. write that result back to `to`
+# The temp repo has global/system git config isolated for predictable output.
+# Args: from (pull hunks from), to (only file written), rel_path (label).
+# Returns 0 if `to` was updated, 1 if aborted / nothing selected.
+sync_common::hunk_merge() {
+  local from="$1"
+  local to="$2"
   local rel_path="$3"
 
-  local repo_root
-  if ! repo_root=$(git -C "$(dirname "$dst")" rev-parse --show-toplevel 2>/dev/null); then
-    echo "  → Cannot merge: repo side is not inside a git repository"
+  if [[ ! -f "$from" || ! -f "$to" ]]; then
+    echo "  → Cannot hunk-merge: both sides must exist as files"
     return 1
   fi
-  local repo_rel="${dst#"$repo_root"/}"
 
-  local base merged
-  base=$(mktemp)
-  merged=$(mktemp)
-  local rc=1
+  local tmpdir
+  tmpdir=$(mktemp -d) || { echo "  → hunk-merge: mktemp failed"; return 1; }
 
-  while true; do
-    if ! git -C "$repo_root" show "HEAD:$repo_rel" > "$base" 2>/dev/null; then
-      # Never committed — no ancestor, so every differing hunk conflicts.
-      : > "$base"
-      echo "  (no committed base version — differing hunks will all conflict)"
-    fi
+  # Keep the real filename (with extension) so git picks syntax highlighting
+  # and shows a meaningful path in the add -p prompt.
+  local name
+  name=$(basename "$rel_path")
+  local work="$tmpdir/$name"
 
-    cp "$src" "$merged"
-    local conflicts=0
-    git merge-file -L "HOME/$rel_path" -L "base/$rel_path" -L "repo/$rel_path" \
-      "$merged" "$base" "$dst" || conflicts=$?
+  # Isolate from user/global/system git config for predictable behaviour.
+  local -a git=(env GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_SYSTEM=/dev/null \
+    GIT_TERMINAL_PROMPT=0 git -C "$tmpdir")
 
-    # git merge-file exits negative (>127 in shell) on error, otherwise
-    # with the number of conflicts.
-    if [[ $conflicts -gt 127 ]]; then
-      echo "  → git merge-file failed — merge aborted, nothing written"
-      break
-    fi
+  "${git[@]}" init -q
+  "${git[@]}" config core.autocrlf false
+  "${git[@]}" config user.email sync@local
+  "${git[@]}" config user.name sync
 
-    if [[ $conflicts -gt 0 ]]; then
-      echo "  → $conflicts conflicting hunk(s) — opening ${EDITOR:-vi} to resolve"
-      if { : < /dev/tty; } 2>/dev/null; then
-        "${EDITOR:-vi}" "$merged" < /dev/tty > /dev/tty 2>&1 || true
-      else
-        "${EDITOR:-vi}" "$merged" || true
-      fi
-      if grep -qE '^(<{7}|>{7})( |$)' "$merged"; then
-        echo "  → Conflict markers still present — merge aborted, nothing written"
-        break
-      fi
-    fi
+  # Commit `to` as the baseline, then overlay `from` in the working tree.
+  cp "$to" "$work"
+  "${git[@]}" add -- "$name"
+  "${git[@]}" commit -q --no-verify -m base
+  cp "$from" "$work"
 
-    cp "$merged" "$src"
-    cp "$merged" "$dst"
-    echo "  → Merged: wrote result to both HOME and repo ($rel_path)"
-    rc=0
-    break
-  done
+  if "${git[@]}" diff --quiet -- "$name"; then
+    echo "  → No differences to merge"
+    rm -rf "$tmpdir"
+    return 1
+  fi
 
-  rm -f "$base" "$merged"
-  return $rc
+  echo "  → git add -p:  y=take hunk  n=leave  s=split  e=edit  q=quit  (?=help)"
+  echo "     '+' lines are the incoming content written into $rel_path on 'y'"
+  # Interactive hunk staging against the terminal.
+  "${git[@]}" add -p -- "$name" < /dev/tty > /dev/tty 2>&1 || true
+
+  # The staged index now holds baseline + selected hunks = merged result.
+  local merged="$tmpdir/.merged"
+  if ! "${git[@]}" show ":$name" > "$merged" 2>/dev/null; then
+    echo "  → Could not read merged result — nothing written"
+    rm -rf "$tmpdir"
+    return 1
+  fi
+
+  if cmp -s "$merged" "$to"; then
+    echo "  → No hunks selected — $rel_path left unchanged"
+    rm -rf "$tmpdir"
+    return 1
+  fi
+
+  cp "$merged" "$to"
+  echo "  → Wrote selected hunks to: $to (other side untouched)"
+  rm -rf "$tmpdir"
+  return 0
 }
 
 # Sync a single file (HOME <-> repo, direction chosen interactively).
@@ -408,15 +471,28 @@ sync_common::sync_file() {
           cp -v "$dst" "$src"
           return 0
           ;;
-        m)
+        h)
           if [[ $only_in_home -eq 1 || $only_in_repo -eq 1 ]]; then
-            echo "  → Cannot merge: file exists on only one side — use (a) or (p)"
+            echo "  → Cannot hunk-merge: file exists on only one side — use (a)/(p)/(s)"
             continue
           fi
-          if sync_common::merge_file "$src" "$dst" "$rel_path"; then
+          # Pick hunks HOME → repo; only the repo side is written.
+          if sync_common::hunk_merge "$src" "$dst" "$rel_path"; then
             return 0
           fi
-          # Merge aborted — re-prompt so the user can pick another action.
+          # Nothing written — re-prompt so the user can pick another action.
+          continue
+          ;;
+        H)
+          if [[ $only_in_home -eq 1 || $only_in_repo -eq 1 ]]; then
+            echo "  → Cannot hunk-merge: file exists on only one side — use (a)/(p)/(s)"
+            continue
+          fi
+          # Pick hunks repo → HOME; only the HOME side is written.
+          if sync_common::hunk_merge "$dst" "$src" "$rel_path"; then
+            return 0
+          fi
+          # Nothing written — re-prompt so the user can pick another action.
           continue
           ;;
         s)
@@ -428,10 +504,6 @@ sync_common::sync_file() {
             echo "  → Skipping — keeping both HOME and repo versions unchanged"
           fi
           return 0
-          ;;
-        d)
-          # interactive_prompt's next iteration re-renders the header and box.
-          continue
           ;;
         q)
           echo "Sync interrupted by user"
