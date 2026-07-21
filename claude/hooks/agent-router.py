@@ -546,9 +546,14 @@ def route_prompt(prompt: str) -> dict | None:
             "hookSpecificOutput": {
                 "hookEventName": "UserPromptSubmit",
                 "additionalContext": (
-                    f"[Agent Routing] Detected '{trigger}' - consider using "
-                    "firecrawl MCP (firecrawl_search / firecrawl_scrape) for "
-                    "external research. Use subagent for context isolation."
+                    f"[Agent Routing] Detected '{trigger}' - run external "
+                    "research on two tracks in parallel: firecrawl MCP "
+                    "(firecrawl_search / firecrawl_scrape) for sourced facts, "
+                    "and `opencode run -m openai/gpt-5.6-sol-pro` for "
+                    "implementation know-how (fall back to "
+                    "github-copilot/gpt-5.6-sol on quota errors). "
+                    "Use subagents for context isolation; prefer the firecrawl "
+                    "sources when the two disagree."
                 ),
             }
         }

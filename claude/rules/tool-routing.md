@@ -3,7 +3,7 @@
 **Defines which tools and operations are delegated to which agent, and how skills are auto-routed.**
 
 This file provides cross-cutting routing decisions.
-外部リサーチは firecrawl MCP、設計相談は OpenCode、コードベース解析は Explore サブエージェントに振り分ける。
+外部リサーチは firecrawl MCP + OpenCode リサーチの二系統、設計相談は OpenCode、コードベース解析は Explore サブエージェントに振り分ける。
 
 ## Skill Auto-Routing
 
@@ -55,28 +55,44 @@ This file provides cross-cutting routing decisions.
 ルーティングルールはタスクサイズに応じて適応される：
 
 - **XS/S タスク**: OpenCode / firecrawl への委託は不要。Claude が直接対応する。
-- **M タスク**: 必要な場合のみ OpenCode サブエージェントで設計相談。firecrawl は未知のライブラリ・外部 API がある場合のみ。
+- **M タスク**: 必要な場合のみ OpenCode サブエージェントで設計相談。外部リサーチ（firecrawl + OpenCode）は未知のライブラリ・外部 API がある場合のみ。
 - **L タスク**: フルルーティング（全ルール適用）。
 
 ## Routing Table
 
 | Operation | Delegate To | Method |
 |-----------|-------------|--------|
-| External research | **firecrawl MCP** | Subagent (`firecrawl_search` / `firecrawl_scrape`) |
+| External research | **firecrawl MCP + OpenCode** | 二系統を並列実行し Claude が統合（下記セクション参照） |
 | PDF / 画像 (ローカル) | **Claude 直接** | Read ツール（PDF・画像はネイティブ対応） |
 | PDF / 記事 (URL) | **firecrawl MCP** | `firecrawl_parse` / `firecrawl_scrape` |
 | 音声・動画 | **未対応** | 委託先なし。ユーザーに扱い方を確認する |
 | Codebase analysis | **Explore subagent** | `Explore`（推奨）or `general-purpose` |
-| Library research | **firecrawl MCP** | `firecrawl_search` + 公式ドキュメントを `firecrawl_scrape` |
+| Library research | **firecrawl MCP + OpenCode** | `firecrawl_search` で一次情報 + OpenCode で実装知見 |
 | Design decisions | **OpenCode** | Subagent or Agent Teams |
 | git (all operations) | **`/deploy` skill** | Deploy Workflow or Ad-hoc Git モード |
 | docker/ruff/uv (in `context: fork` skills) | **Direct** | スキル内で直接実行 |
 | docker/ruff/uv (ad-hoc) | **Subagent** | サブエージェント経由で直接実行 |
 | GitHub MCP / Linear MCP | **Direct or Subagent** | スキル内は直接、アドホックはサブエージェント |
 
-## External Research via firecrawl MCP
+## External Research via firecrawl MCP + OpenCode
 
-Web 上の情報が必要な調査は firecrawl MCP に振り分ける（`gemini` CLI は廃止済み）。
+外部リサーチは **二系統を並列実行**し、Claude が突き合わせて統合する（`gemini` CLI は廃止済み）。
+
+| 系統 | ツール | 得意分野 |
+|------|-------|---------|
+| **一次情報** | firecrawl MCP | 公式ドキュメント・リリースノートの実文面。出典 URL が取れる |
+| **実装知見** | OpenCode CLI | 学習済み知識に基づく設計上の勘所・落とし穴・比較 |
+
+**併用の理由**: firecrawl は「現在の事実」を出典付きで取れるが解釈はしない。OpenCode は解釈と経験則を出せるが出典を持たない。両者が食い違った場合は **firecrawl の一次情報を優先**し、相違点を Decision Log に残す。
+
+### OpenCode リサーチの実行
+
+```bash
+opencode run -m openai/gpt-5.6-sol-pro "{research question}" 2>/dev/null
+```
+
+- モデルが `Quota exceeded` 等で失敗した場合は `github-copilot/gpt-5.6-sol` にフォールバックする
+- サブエージェント経由で実行し、メインコンテキストを汚さない
 
 ### Scope
 
@@ -85,7 +101,7 @@ Web 上の情報が必要な調査は firecrawl MCP に振り分ける（`gemini
 - 既知の不具合・脆弱性・回避策
 - 実装事例・ベンチマーク・比較記事
 
-### Tools
+### Tools（firecrawl 系統）
 
 | Tool | 用途 |
 |------|------|
@@ -97,7 +113,10 @@ Web 上の情報が必要な調査は firecrawl MCP に振り分ける（`gemini
 
 ### How to Route
 
+2 つのサブエージェントを **同時に起動**する（片方の結果を待たない）。
+
 ```
+# 系統 1: 一次情報
 Task tool parameters:
 - subagent_type: "general-purpose"
 - run_in_background: true
@@ -108,17 +127,34 @@ Task tool parameters:
     sources (official docs / release notes) for detail.
     Cite the source URL for every claim.
 
-    Save full output to: .claude/docs/research/{topic}.md
+    Save full output to: .claude/docs/research/{topic}-sources.md
     Return CONCISE summary.
+
+# 系統 2: 実装知見
+Task tool parameters:
+- subagent_type: "general-purpose"
+- run_in_background: true
+- prompt: |
+    Run OpenCode research on: {topic}
+
+    opencode run -m openai/gpt-5.6-sol-pro "{research question}" 2>/dev/null
+    On "Quota exceeded" or model error, retry with:
+    opencode run -m github-copilot/gpt-5.6-sol "{research question}" 2>/dev/null
+
+    Save full output to: .claude/docs/research/{topic}-opencode.md
+    Return CONCISE summary, and flag anything you are NOT confident about
+    so it can be checked against the firecrawl sources.
 ```
+
+両者の結果を Claude が統合する。**食い違いがあれば firecrawl の一次情報を採用**し、相違点を TASK_FILE の Decision Log に記録する。
 
 ### Triggers
 
 | User Input | Action |
 |------------|--------|
-| 「調べて」「リサーチして」「最新バージョンは」 | firecrawl MCP に委託 |
-| 「公式ドキュメントを見て」「仕様を確認して」 | firecrawl MCP に委託 |
-| 「既知の不具合はある?」「脆弱性を確認して」 | firecrawl MCP に委託 |
+| 「調べて」「リサーチして」「最新バージョンは」 | firecrawl + OpenCode を並列実行 |
+| 「公式ドキュメントを見て」「仕様を確認して」 | firecrawl 主体（OpenCode は任意） |
+| 「既知の不具合はある?」「脆弱性を確認して」 | firecrawl + OpenCode を並列実行 |
 
 ### Exceptions (Claude handles directly)
 
@@ -294,9 +330,9 @@ Task tool parameters:
 - ファイル内容の編集（Edit/Write ツール）
 - 新規ソースコード作成（Claude の領域）
 
-### firecrawl MCP を使うケース（外部情報が必要な場合のみ）
+### 外部リサーチを使うケース（外部情報が必要な場合のみ）
 
-以下の場合はサブエージェント内で firecrawl MCP を併用する：
+以下の場合はサブエージェント内で firecrawl MCP / OpenCode を併用する：
 
 - パッケージの最新バージョン・脆弱性チェック
 - 未知のライブラリの使い方調査
@@ -304,6 +340,10 @@ Task tool parameters:
 ```
 firecrawl_search: "Check the latest stable versions and known issues for: {packages}"
 → 公式ドキュメント / リリースノートは firecrawl_scrape で本文を取得
+
+opencode run -m openai/gpt-5.6-sol-pro "{same question}" 2>/dev/null
+→ Quota exceeded 等で失敗したら github-copilot/gpt-5.6-sol にフォールバック
+→ バージョン番号など「現在の事実」は firecrawl の結果を正とする
 ```
 
 ---
