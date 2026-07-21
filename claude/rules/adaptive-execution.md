@@ -73,9 +73,11 @@ Any of the following automatically escalates to L:
 | **M** | 2 reviewers (Security + Quality) |
 | **L** | Full 4 reviewers (Security, Quality, Test, Simplify) |
 
-### External Research (firecrawl MCP)
+### External Research (firecrawl MCP + OpenCode)
 
-| Tier | firecrawl Usage |
+外部リサーチは firecrawl MCP（一次情報）と OpenCode `openai/gpt-5.6-sol-pro`（実装知見）を並列実行する。
+
+| Tier | Usage |
 |------|-------------|
 | **XS** | Never |
 | **S** | Never |
