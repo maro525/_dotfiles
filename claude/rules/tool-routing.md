@@ -68,7 +68,7 @@ This file provides cross-cutting routing decisions.
 | 音声・動画 | **未対応** | 委託先なし。ユーザーに扱い方を確認する |
 | Codebase analysis | **Explore subagent** | `Explore`（推奨）or `general-purpose` |
 | Library research | **firecrawl MCP + OpenCode** | `firecrawl_search` で一次情報 + OpenCode で実装知見 |
-| Design decisions | **OpenCode** | Subagent or Agent Teams |
+| Design decisions | **OpenCode** | Subagent（`opencode run -m openai/gpt-5.6-sol-pro`、失敗時 `github-copilot/gpt-5.6-sol`） |
 | git (all operations) | **`/deploy` skill** | Deploy Workflow or Ad-hoc Git モード |
 | docker/ruff/uv (in `context: fork` skills) | **Direct** | スキル内で直接実行 |
 | docker/ruff/uv (ad-hoc) | **Subagent** | サブエージェント経由で直接実行 |
