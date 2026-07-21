@@ -24,7 +24,7 @@ You receive arguments in this format:
 | Tier | Behavior |
 |------|----------|
 | **S** | Skip Phase 2 (Research & Design). Go directly to Phase 3 (Plan). |
-| **M** | Run design consultation. Use `opencode run` or `gemini -p` for external input. |
+| **M** | Run design consultation via `opencode run`. Use `web_search` / `web_fetch` for external input. |
 | **L** | Launch Researcher and Architect in parallel using `subagent` PARALLEL mode. |
 
 ## PHASE 1: UNDERSTAND
@@ -51,7 +51,9 @@ You receive arguments in this format:
 - **tier=S:** Skip this phase entirely.
 - **tier=M:** Consult external tools for design advice:
   ```bash
-  opencode run -m github-copilot/gpt-5.5 "{design question}" 2>/dev/null
+  opencode run -m openai/gpt-5.6-sol-pro "{design question}" 2>/dev/null
+  # On "Quota exceeded" or model error, retry with:
+  opencode run -m github-copilot/gpt-5.6-sol "{design question}" 2>/dev/null
   ```
   Write the resulting design to TASK_FILE `Design` section.
 - **tier=L:** Launch parallel research + architecture subagents:

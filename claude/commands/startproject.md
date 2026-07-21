@@ -32,7 +32,7 @@ $ARGUMENTS の形式: "{task description} --tier={S|M|L} --task-file={TASK_FILE}
 
 1. コードベースを Explore / Glob / Grep / Read で直接読む
    - 構造・主要モジュール・既存パターン・関連コード・テスト構造
-   - git 履歴調査が必要なら Gemini サブエージェントに委託
+   - git 履歴調査が必要なら Explore サブエージェントに委託（`git log` / `git diff`）
 
 2. 要件ヒアリング
    - 目的・スコープ・技術要件・成功基準・最終デザイン
@@ -65,7 +65,9 @@ $ARGUMENTS の形式: "{task description} --tier={S|M|L} --task-file={TASK_FILE}
 OpenCode サブエージェントに設計相談:
 
 ```bash
-opencode run -m github-copilot/gpt-5.5 "{question}" 2>/dev/null
+opencode run -m openai/gpt-5.6-sol-pro "{question}" 2>/dev/null
+# Quota exceeded 等で失敗したら:
+opencode run -m github-copilot/gpt-5.6-sol "{question}" 2>/dev/null
 ```
 
 - subagent_type: general-purpose
@@ -77,7 +79,8 @@ Researcher と Architect を **並列起動**し、双方向通信させる。
 
 | エージェント | ツール | 役割 |
 |---|---|---|
-| Researcher | Gemini CLI | 外部ライブラリ・事例を調査し Claude Lead に報告 |
+| Researcher (一次情報) | firecrawl MCP | 公式ドキュメント・リリースノートを出典 URL 付きで調査 |
+| Researcher (実装知見) | OpenCode `openai/gpt-5.6-sol-pro` | 設計上の勘所・落とし穴を調査（失敗時 `github-copilot/gpt-5.6-sol`） |
 | Architect | OpenCode CLI | 設計方針を策定し Claude Lead に報告 |
 
 両者はリアルタイムで発見を共有し、設計を相互に調整する。

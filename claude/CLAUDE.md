@@ -1,4 +1,4 @@
-Claude Code + OpenCode CLI + Gemini CLI で並列開発を加速する。
+Claude Code + OpenCode CLI で並列開発を加速する。外部リサーチは firecrawl MCP と OpenCode リサーチ（`openai/gpt-5.6-sol-pro`）を並行実行し、Claude が統合する。
 
 DOCUMENTATION STRUCTURE
   .claude/commands/ — orchestrate / startproject / team-implement / team-review / deploy
