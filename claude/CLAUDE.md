@@ -1,4 +1,4 @@
-Claude Code + OpenCode CLI + Gemini CLI で並列開発を加速する。
+Claude Code + OpenCode CLI で並列開発を加速する。外部リサーチは firecrawl MCP を使う。
 
 DOCUMENTATION STRUCTURE
   .claude/commands/ — orchestrate / startproject / team-implement / team-review / deploy

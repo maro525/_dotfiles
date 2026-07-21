@@ -21,6 +21,7 @@ sync_common::sync_file "$SOURCE/settings.json" "$DEST/settings.json" "settings.j
 # that exist only in repo or only in HOME).
 sync_common::sync_directory "$SOURCE/commands" "$DEST/commands" "*" || true
 sync_common::sync_directory "$SOURCE/hooks"    "$DEST/hooks"    "*" || true
+sync_common::sync_directory "$SOURCE/rules"    "$DEST/rules"    "*" || true
 sync_common::sync_directory "$SOURCE/skills"   "$DEST/skills"   "*" || true
 
 echo ""

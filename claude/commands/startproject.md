@@ -32,7 +32,7 @@ $ARGUMENTS の形式: "{task description} --tier={S|M|L} --task-file={TASK_FILE}
 
 1. コードベースを Explore / Glob / Grep / Read で直接読む
    - 構造・主要モジュール・既存パターン・関連コード・テスト構造
-   - git 履歴調査が必要なら Gemini サブエージェントに委託
+   - git 履歴調査が必要なら Explore サブエージェントに委託（`git log` / `git diff`）
 
 2. 要件ヒアリング
    - 目的・スコープ・技術要件・成功基準・最終デザイン
@@ -77,7 +77,7 @@ Researcher と Architect を **並列起動**し、双方向通信させる。
 
 | エージェント | ツール | 役割 |
 |---|---|---|
-| Researcher | Gemini CLI | 外部ライブラリ・事例を調査し Claude Lead に報告 |
+| Researcher | firecrawl MCP | 外部ライブラリ・事例を調査し Claude Lead に報告 |
 | Architect | OpenCode CLI | 設計方針を策定し Claude Lead に報告 |
 
 両者はリアルタイムで発見を共有し、設計を相互に調整する。

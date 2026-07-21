@@ -5,7 +5,7 @@ UserPromptSubmit hook: Unified intent router for skills and agents.
 Routes user prompts to the appropriate skill or agent:
 1. If an explicit skill command (/orchestrate, /startproject, etc.) is present, do nothing.
 2. Detect skill intent and route to /orchestrate (main entry point).
-3. Detect agent intent (OpenCode, Gemini).
+3. Detect agent intent (OpenCode, firecrawl MCP, Explore subagent).
 4. Exclude lightweight tasks (questions, single-file edits, explanations).
 
 Output: additionalContext suggesting the best action (soft recommendation, not forced).
@@ -287,25 +287,33 @@ OPENCODE_TRIGGERS = {
     ],
 }
 
-GEMINI_TRIGGERS = {
+# External (web) research → firecrawl MCP
+RESEARCH_TRIGGERS = {
     "ja": [
         "調べて",
         "リサーチして",
         "調査して",
-        "pdf",
-        "動画を",
-        "音声を",
-        "コードベース全体",
-        "横断的に",
+        "最新バージョン",
+        "公式ドキュメント",
     ],
     "en": [
         "research this",
         "investigate",
         "look up",
-        "analyze this pdf",
-        "analyze this video",
-        "analyze this audio",
+        "latest version",
+        "official docs",
+    ],
+}
+
+# Codebase-wide analysis → Explore subagent (local tools, no web access)
+CODEBASE_TRIGGERS = {
+    "ja": [
+        "コードベース全体",
+        "横断的に",
+    ],
+    "en": [
         "entire codebase",
+        "across the codebase",
     ],
 }
 
@@ -435,10 +443,17 @@ def detect_agent_intent(prompt: str) -> tuple[str | None, str]:
             if trigger in prompt_lower:
                 return "opencode", trigger
 
-    for triggers in GEMINI_TRIGGERS.values():
+    # Codebase triggers are checked first — they are more specific than the
+    # generic research wording (e.g. "コードベース全体を調べて" matches both).
+    for triggers in CODEBASE_TRIGGERS.values():
         for trigger in triggers:
             if trigger in prompt_lower:
-                return "gemini", trigger
+                return "explore", trigger
+
+    for triggers in RESEARCH_TRIGGERS.values():
+        for trigger in triggers:
+            if trigger in prompt_lower:
+                return "firecrawl", trigger
 
     return None, ""
 
@@ -513,7 +528,7 @@ def route_prompt(prompt: str) -> dict | None:
             }
         }
 
-    # 3. Agent intent (OpenCode / Gemini)
+    # 3. Agent intent (OpenCode / firecrawl MCP / Explore)
     agent, trigger = detect_agent_intent(prompt)
     if agent == "opencode":
         return {
@@ -526,13 +541,24 @@ def route_prompt(prompt: str) -> dict | None:
                 ),
             }
         }
-    elif agent == "gemini":
+    elif agent == "firecrawl":
         return {
             "hookSpecificOutput": {
                 "hookEventName": "UserPromptSubmit",
                 "additionalContext": (
                     f"[Agent Routing] Detected '{trigger}' - consider using "
-                    "Gemini CLI for external research or multimodal processing. "
+                    "firecrawl MCP (firecrawl_search / firecrawl_scrape) for "
+                    "external research. Use subagent for context isolation."
+                ),
+            }
+        }
+    elif agent == "explore":
+        return {
+            "hookSpecificOutput": {
+                "hookEventName": "UserPromptSubmit",
+                "additionalContext": (
+                    f"[Agent Routing] Detected '{trigger}' - consider using "
+                    "the Explore subagent for codebase-wide analysis. "
                     "Use subagent for context isolation."
                 ),
             }

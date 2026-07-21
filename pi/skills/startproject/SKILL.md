@@ -65,7 +65,7 @@ Researcher と Architect を **並列起動**。
 
 | ロール | ツール | 役割 |
 |-------|-------|------|
-| Researcher | Gemini CLI | 外部ライブラリ・事例を調査 |
+| Researcher | `web_search` / `web_fetch` | 外部ライブラリ・事例を調査（出典 URL を必ず添える） |
 | Architect  | OpenCode 別セッション | 設計方針を策定 |
 
 両者の成果を Lead がメモリ内で統合し、TASK_FILE の `Design` に書き込む。

@@ -24,7 +24,7 @@ You receive arguments in this format:
 | Tier | Behavior |
 |------|----------|
 | **S** | Skip Phase 2 (Research & Design). Go directly to Phase 3 (Plan). |
-| **M** | Run design consultation. Use `opencode run` or `gemini -p` for external input. |
+| **M** | Run design consultation via `opencode run`. Use `web_search` / `web_fetch` for external input. |
 | **L** | Launch Researcher and Architect in parallel using `subagent` PARALLEL mode. |
 
 ## PHASE 1: UNDERSTAND
