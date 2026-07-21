@@ -1,12 +1,13 @@
 {
-  "defaultModel": "gemma4:26b",
-  "defaultProvider": "ollama",
+  "defaultModel": "accounts/fireworks/models/glm-5p2",
+  "defaultProvider": "fireworks",
   "defaultThinkingLevel": "high",
   "hideThinkingBlock": true,
-  "lastChangelogVersion": "0.79.4",
+  "lastChangelogVersion": "0.80.10",
   "packages": [
     "npm:pi-subagents",
-    "npm:@ollama/pi-web-search"
+    "npm:@ollama/pi-web-search",
+    "npm:pi-opencode-bridge"
   ],
   "theme": "dark"
 }
