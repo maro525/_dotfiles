@@ -113,6 +113,16 @@
       "type": "local",
       "command": ["npx", "-y", "mcp-remote", "https://mcp.linear.app/mcp"],
       "enabled": true
+    },
+    // 外部リサーチ用（Gemini CLI の後継）。API キーは ~/.bashrc.local で
+    // FIRECRAWL_API_KEY を export する — この設定ファイルには直書きしない。
+    "firecrawl": {
+      "type": "local",
+      "command": ["npx", "-y", "firecrawl-mcp"],
+      "environment": {
+        "FIRECRAWL_API_KEY": "{env:FIRECRAWL_API_KEY}"
+      },
+      "enabled": true
     }
   }
 }

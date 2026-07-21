@@ -10,7 +10,6 @@ permission:
     "git show *": allow
     "git diff *": allow
     "rg *": allow
-    "gemini *": allow
 ---
 
 # startproject
@@ -31,7 +30,8 @@ $ARGUMENTS: "{task description} --tier={S|M|L} --task-file={TASK_FILE} --linear-
    - 構造・主要モジュール・既存パターン・関連コード・テスト構造
    - git 履歴調査が必要な場合:
      ```bash
-     gemini -p "Summarize git history for {area}" 2>/dev/null
+     git log --oneline -20 -- {area}
+     git diff HEAD~5..HEAD -- {area}
      ```
 
 2. 要件ヒアリング
@@ -57,7 +57,7 @@ $ARGUMENTS: "{task description} --tier={S|M|L} --task-file={TASK_FILE} --linear-
 成果物はすべて TASK_FILE の `Design` に書き込む（外部ファイル不作成）。
 
 設計相談は `task` tool で subagent を起動する（同モデル・別コンテキストで独立性を確保）。
-モデル多様性が必要な外部リサーチは Gemini CLI を使う。
+外部リサーチは firecrawl MCP（`firecrawl_search` / `firecrawl_scrape`）を使う。
 
 ### tier=S
 スキップ → Phase 3。
@@ -75,7 +75,7 @@ Researcher と Architect を **並列起動**。
 
 | ロール | ツール | 役割 |
 |-------|-------|------|
-| Researcher | Gemini CLI | 外部ライブラリ・事例を調査（モデル多様性が活きる役割） |
+| Researcher | firecrawl MCP | 外部ライブラリ・事例を調査（出典 URL を必ず添える） |
 | Architect  | `task` tool（subagent） | 設計方針を策定 |
 
 両者の成果を Lead がメモリ内で統合し、TASK_FILE の `Design` に書き込む。
