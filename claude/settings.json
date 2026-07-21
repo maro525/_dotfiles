@@ -139,8 +139,11 @@
       "Bash(sudo:*)",
       "Bash(rm -rf:*)",
       "Read(**/.env*)",
-      "Read(**/*token*)",
-      "Read(**/*key*)",
+      "Read(**/*.token)",
+      "Read(**/*.key)",
+      "Read(**/*.pem)",
+      "Read(**/*.pfx)",
+      "Read(**/*.p12)",
       "Bash(git reset:*)",
       "Read(id_rsa)",
       "Read(id_ed25519)",
@@ -201,15 +204,25 @@
       }
     ]
   },
-  "enabledPlugins": {},
+  "enabledPlugins": {
+    "paper-desktop@paper": true
+  },
+  "extraKnownMarketplaces": {
+    "paper": {
+      "source": {
+        "source": "github",
+        "repo": "paper-design/agent-plugins"
+      }
+    }
+  },
   "effortLevel": "xhigh",
+  "showThinkingSummaries": true,
   "skipDangerousModePermissionPrompt": true,
   "skipWorkflowUsageWarning": true,
   "verbose": true,
   "teammateMode": "in-process",
   "remoteControlAtStartup": true,
+  "inputNeededNotifEnabled": true,
   "agentPushNotifEnabled": true,
-  "skipAutoPermissionPrompt": true,
-  "fallbackModel": ["opus", "sonnet"],
-  "showThinkingSummaries": true
+  "skipAutoPermissionPrompt": true
 }
