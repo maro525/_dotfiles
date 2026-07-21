@@ -56,7 +56,9 @@ $ARGUMENTS: "{task description} --tier={S|M|L} --task-file={TASK_FILE} --linear-
 ### tier=M
 別セッションで設計相談:
 ```bash
-opencode run -m github-copilot/gpt-5.5 "{設計相談内容}" 2>/dev/null
+opencode run -m openai/gpt-5.6-sol-pro "{設計相談内容}" 2>/dev/null
+# Quota exceeded 等で失敗したら:
+opencode run -m github-copilot/gpt-5.6-sol "{設計相談内容}" 2>/dev/null
 ```
 得られた設計方針を TASK_FILE の `Design` に書き込む。
 
@@ -65,7 +67,7 @@ Researcher と Architect を **並列起動**。
 
 | ロール | ツール | 役割 |
 |-------|-------|------|
-| Researcher | Gemini CLI | 外部ライブラリ・事例を調査 |
+| Researcher | `web_search` / `web_fetch` | 外部ライブラリ・事例を調査（出典 URL を必ず添える） |
 | Architect  | OpenCode 別セッション | 設計方針を策定 |
 
 両者の成果を Lead がメモリ内で統合し、TASK_FILE の `Design` に書き込む。
