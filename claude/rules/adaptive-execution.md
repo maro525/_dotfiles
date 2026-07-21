@@ -86,6 +86,8 @@ Any of the following automatically escalates to L:
 
 ### OpenCode Design Consultation
 
+設計相談も外部リサーチと同じモデルを使う: `openai/gpt-5.6-sol-pro`（失敗時 `github-copilot/gpt-5.6-sol`）。
+
 | Tier | OpenCode Usage |
 |------|------------|
 | **XS** | Never |
