@@ -1,7 +1,8 @@
 ---
 description: Review subagent — parallel reviewers (Quality / Logic / Security / Simplify), browser/test verification. Outputs PASS / FAIL to TASK_FILE.
 mode: subagent
-temperature: 0.1
+model: github-copilot/gpt-5.6-sol
+variant: xhigh
 permission:
   edit: allow
 ---

@@ -1,7 +1,8 @@
 ---
 description: Deploy subagent — push feature branch, create PR/MR via gh (GitHub) or glab (GitLab) CLI, update Linear. Also handles ad-hoc git operations.
 mode: subagent
-temperature: 0.1
+model: github-copilot/gpt-5.6-terra
+variant: low
 permission:
   edit: allow
 ---

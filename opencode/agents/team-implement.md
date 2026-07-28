@@ -1,7 +1,8 @@
 ---
 description: Implementation subagent — reads design, implements code, writes to TASK_FILE.
 mode: subagent
-temperature: 0.2
+model: github-copilot/gpt-5.6-terra
+variant: xhigh
 permission:
   edit: allow
 ---
