@@ -1,7 +1,8 @@
 ---
 description: Project kickoff subagent — understand codebase, research/design, create plan. Writes Brief / Design / Decision Log to TASK_FILE.
 mode: subagent
-temperature: 0.2
+model: github-copilot/gpt-5.6-sol
+variant: xhigh
 permission:
   edit: allow
 ---

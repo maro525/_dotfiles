@@ -17,7 +17,6 @@ sync_common::show_header "$(basename "$0")"
 # AGENTS.md is OpenCode-specific (per-CLI split — pi has its own pi/AGENTS.md).
 sync_common::sync_file "$SOURCE/AGENTS.md"      "$DEST/AGENTS.md"           "opencode/AGENTS.md" || true
 sync_common::sync_file "$SOURCE/opencode.jsonc" "$DEST/opencode.jsonc"      "opencode.jsonc" || true
-sync_common::sync_file "$SOURCE/config.toml"    "$DEST/config.toml"         "config.toml" || true
 
 # agents
 sync_common::sync_directory "$SOURCE/agents" "$DEST/agents" "*.md" || true

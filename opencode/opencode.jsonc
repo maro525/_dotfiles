@@ -106,7 +106,9 @@
       "bun *": "allow",
       "deno *": "allow"
     },
-    "webfetch": "allow"
+    "webfetch": "allow",
+    // 旧 config.toml の `web_search = "live"` の移行先。
+    "websearch": "allow"
   },
   "mcp": {
     "linear": {
