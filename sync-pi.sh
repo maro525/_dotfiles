@@ -3,9 +3,7 @@
 # Same direction as sync-opencode.sh: HOME -> repo (snapshot).
 #
 # auth.json / sessions/ / bin/ / node_modules はリポジトリに含めない。
-# ~/.pi/agent/skills/ は pi-subagents パッケージ由来の design スキル
-# (adapt, animate, ...) と混在しているため、自分の workflow スキルだけを
-# allowlist で抽出して同期する。
+# 同期対象は pi 基本設定のみ (AGENTS.md / settings.json / permissions.ts)。
 
 set -euo pipefail
 
@@ -34,24 +32,6 @@ if [[ -f "$SOURCE/extensions/permissions/index.ts" ]]; then
 else
   echo "Warning: $SOURCE/extensions/permissions/index.ts not found in HOME — run sync-pi.sh after deploying first." >&2
 fi
-
-# Workflow skills (allowlist — design スキルは除外)
-WORKFLOW_SKILLS=(orchestrate startproject team-implement team-review deploy)
-mkdir -p "$DEST/skills"
-for skill in "${WORKFLOW_SKILLS[@]}"; do
-  src="$SOURCE/skills/$skill"
-  if [[ -d "$src" ]]; then
-    sync_common::sync_directory "$src" "$DEST/skills/$skill" "*"
-  else
-    echo "Warning: $src not found in HOME — run sync-pi.sh after deploying first." >&2
-  fi
-done
-
-# Subagent definitions
-sync_common::sync_directory "$SOURCE/agents" "$DEST/agents" "*.md" || true
-
-# Workflow prompt templates
-sync_common::sync_directory "$SOURCE/prompts" "$DEST/prompts" "*.md" || true
 
 echo ""
 echo "Done."
