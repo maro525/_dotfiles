@@ -9,14 +9,11 @@ pi CLI + OpenCode CLI で並列開発を加速するためのエージェント�
 | `pi/AGENTS.md` | pi 用グローバル指示（OpenCode の `opencode/AGENTS.md` とは独立） |
 | `pi/settings.json` | pi 本体設定 (default model / provider / theme) |
 | `pi/extensions/permissions.ts` | bash コマンド パーミッション (allow/deny/ask) + Atuin 履歴統合 |
-| `../pi-orchestrator/` | プロジェクトオーケストレーター（skills/agents/prompts/extension/config）— 単独リポジトリ |
 | `.claude/docs/decisions/task-{LINEAR_ID}-{feature}.md` | 統合タスクファイル (SSoT) — 全 CLI で共有 |
 | `.claude/docs/libraries/` | ライブラリ制約 |
 | `.claude/logs/` | CLI 入出力ログ |
 
 `.claude/docs/` ツリーは全 CLI で共有する（同じタスクファイルを参照）。
-
-オーケストレーターワークフロー（`/orchestrate`, startproject / team-implement / team-review / deploy の各フェーズ、tier 分類、gate、per-phase model routing、budget）は `pi-orchestrator` リポジトリで管理し、`~/.pi/agent/{agents,prompts,orchestrator.json,extensions/orchestrator}` としてシンボリックリンク展開する。設定・手順の変更はそちらで行うこと。
 
 ## LANGUAGE PROTOCOL
 

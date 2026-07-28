@@ -3,9 +3,7 @@
 # Same direction as sync-opencode.sh: HOME -> repo (snapshot).
 #
 # auth.json / sessions/ / bin/ / node_modules はリポジトリに含めない。
-# オーケストレーター (agents/ prompts/ orchestrator.json extensions/orchestrator/)
-# は pi-orchestrator リポジトリで管理し ~/.pi/agent/ に symlink 展開するため、
-# ここでは同期しない（AGENTS.md / settings.json / permissions.ts のみ）。
+# 同期対象は pi 基本設定のみ (AGENTS.md / settings.json / permissions.ts)。
 
 set -euo pipefail
 
@@ -20,9 +18,6 @@ sync_common::parse_args "$(basename "$0")" "Sync ~/.pi/agent/ dotfiles to this r
 sync_common::show_header "$(basename "$0")"
 
 # pi global instructions (per-CLI split — OpenCode has its own opencode/AGENTS.md).
-# NOTE: orchestrator workflow (agents/, prompts/, orchestrator.json, extensions/orchestrator/)
-#       lives in the separate pi-orchestrator repo and is symlinked into ~/.pi/agent/ —
-#       do NOT sync those here.
 sync_common::sync_file "$SOURCE/AGENTS.md" "$DEST/AGENTS.md" "pi/AGENTS.md" || true
 
 # Top-level pi config
