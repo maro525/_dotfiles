@@ -521,14 +521,40 @@ sync_common::sync_file() {
   return 0
 }
 
+# True when rel_path is covered by one of the given exclude patterns.
+# A pattern matches when it equals the relative path, is a parent directory
+# of it ("cloudflare" excludes "cloudflare/references/x.md"), or matches it
+# as a glob ("cloudflare-*").
+# Args: rel_path, [pattern...].
+sync_common::path_excluded() {
+  local rel_path="$1"
+  shift
+
+  local pattern
+  for pattern in "$@"; do
+    [[ -z "$pattern" ]] && continue
+    # shellcheck disable=SC2053  # unquoted RHS is intentional (glob match)
+    if [[ "$rel_path" == "$pattern" || "$rel_path" == "$pattern"/* || "$rel_path" == $pattern ]]; then
+      return 0
+    fi
+  done
+
+  return 1
+}
+
 # Sync files matching a glob pattern in a directory tree (recursive).
-# Args: src_dir, dst_dir, [pattern (default: *.md)].
+# Args: src_dir, dst_dir, [pattern (default: *.md)], [exclude...].
 # Each matching file is prompted individually via sync_file.
-# Excludes: node_modules/ trees and *.lock files.
+# Excludes: node_modules/ trees, *.lock files, and any relative path covered
+# by an `exclude` argument (see path_excluded for the matching rules).
 sync_common::sync_directory() {
   local src_dir="$1"
   local dst_dir="$2"
   local pattern="${3:-*.md}"
+  local -a excludes=()
+  if [[ $# -gt 3 ]]; then
+    excludes=("${@:4}")
+  fi
 
   if [[ ! -d "$src_dir" && ! -d "$dst_dir" ]]; then
     echo "Warning: neither $src_dir nor $dst_dir exists — run the sync script after deploying first." >&2
@@ -561,8 +587,17 @@ sync_common::sync_directory() {
     return 0
   fi
 
+  local excluded_count=0
   while IFS= read -r rel_path; do
     [[ -z "$rel_path" ]] && continue
+    if sync_common::path_excluded "$rel_path" ${excludes[@]+"${excludes[@]}"}; then
+      excluded_count=$((excluded_count + 1))
+      continue
+    fi
     sync_common::sync_file "$src_dir/$rel_path" "$dst_dir/$rel_path" "$rel_path" || true
   done < <(printf '%s\n' "${rel_paths[@]}" | sort -u)
+
+  if [[ $excluded_count -gt 0 ]]; then
+    echo "Excluded $excluded_count file(s) under $(basename "$src_dir")/ (patterns: ${excludes[*]})"
+  fi
 }
