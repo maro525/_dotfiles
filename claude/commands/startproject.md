@@ -65,7 +65,7 @@ $ARGUMENTS の形式: "{task description} --tier={S|M|L} --task-file={TASK_FILE}
 OpenCode サブエージェントに設計相談:
 
 ```bash
-opencode run -m openai/gpt-5.6-sol-pro "{question}" 2>/dev/null
+opencode run -m openai/gpt-5.6-sol "{question}" 2>/dev/null
 # Quota exceeded 等で失敗したら:
 opencode run -m github-copilot/gpt-5.6-sol "{question}" 2>/dev/null
 ```
@@ -80,7 +80,7 @@ Researcher と Architect を **並列起動**し、双方向通信させる。
 | エージェント | ツール | 役割 |
 |---|---|---|
 | Researcher (一次情報) | firecrawl MCP | 公式ドキュメント・リリースノートを出典 URL 付きで調査 |
-| Researcher (実装知見) | OpenCode `openai/gpt-5.6-sol-pro` | 設計上の勘所・落とし穴を調査（失敗時 `github-copilot/gpt-5.6-sol`） |
+| Researcher (実装知見) | OpenCode `openai/gpt-5.6-sol` | 設計上の勘所・落とし穴を調査（失敗時 `github-copilot/gpt-5.6-sol`） |
 | Architect | OpenCode CLI | 設計方針を策定し Claude Lead に報告 |
 
 両者はリアルタイムで発見を共有し、設計を相互に調整する。

@@ -68,7 +68,7 @@ This file provides cross-cutting routing decisions.
 | 音声・動画 | **未対応** | 委託先なし。ユーザーに扱い方を確認する |
 | Codebase analysis | **Explore subagent** | `Explore`（推奨）or `general-purpose` |
 | Library research | **firecrawl MCP + OpenCode** | `firecrawl_search` で一次情報 + OpenCode で実装知見 |
-| Design decisions | **OpenCode** | Subagent（`opencode run -m openai/gpt-5.6-sol-pro`、失敗時 `github-copilot/gpt-5.6-sol`） |
+| Design decisions | **OpenCode** | Subagent（`opencode run -m openai/gpt-5.6-sol`、失敗時 `github-copilot/gpt-5.6-sol`） |
 | git (all operations) | **`/deploy` skill** | Deploy Workflow or Ad-hoc Git モード |
 | docker/ruff/uv (in `context: fork` skills) | **Direct** | スキル内で直接実行 |
 | docker/ruff/uv (ad-hoc) | **Subagent** | サブエージェント経由で直接実行 |
@@ -88,7 +88,7 @@ This file provides cross-cutting routing decisions.
 ### OpenCode リサーチの実行
 
 ```bash
-opencode run -m openai/gpt-5.6-sol-pro "{research question}" 2>/dev/null
+opencode run -m openai/gpt-5.6-sol "{research question}" 2>/dev/null
 ```
 
 - モデルが `Quota exceeded` 等で失敗した場合は `github-copilot/gpt-5.6-sol` にフォールバックする
@@ -137,7 +137,7 @@ Task tool parameters:
 - prompt: |
     Run OpenCode research on: {topic}
 
-    opencode run -m openai/gpt-5.6-sol-pro "{research question}" 2>/dev/null
+    opencode run -m openai/gpt-5.6-sol "{research question}" 2>/dev/null
     On "Quota exceeded" or model error, retry with:
     opencode run -m github-copilot/gpt-5.6-sol "{research question}" 2>/dev/null
 
@@ -341,7 +341,7 @@ Task tool parameters:
 firecrawl_search: "Check the latest stable versions and known issues for: {packages}"
 → 公式ドキュメント / リリースノートは firecrawl_scrape で本文を取得
 
-opencode run -m openai/gpt-5.6-sol-pro "{same question}" 2>/dev/null
+opencode run -m openai/gpt-5.6-sol "{same question}" 2>/dev/null
 → Quota exceeded 等で失敗したら github-copilot/gpt-5.6-sol にフォールバック
 → バージョン番号など「現在の事実」は firecrawl の結果を正とする
 ```

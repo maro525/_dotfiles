@@ -549,7 +549,7 @@ def route_prompt(prompt: str) -> dict | None:
                     f"[Agent Routing] Detected '{trigger}' - run external "
                     "research on two tracks in parallel: firecrawl MCP "
                     "(firecrawl_search / firecrawl_scrape) for sourced facts, "
-                    "and `opencode run -m openai/gpt-5.6-sol-pro` for "
+                    "and `opencode run -m openai/gpt-5.6-sol` for "
                     "implementation know-how (fall back to "
                     "github-copilot/gpt-5.6-sol on quota errors). "
                     "Use subagents for context isolation; prefer the firecrawl "
