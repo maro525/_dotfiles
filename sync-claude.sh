@@ -13,22 +13,8 @@ source "$SCRIPT_DIR/lib/sync-common.sh"
 sync_common::parse_args "$(basename "$0")" "Sync ~/.claude dotfiles to this repository." "$@"
 sync_common::show_header "$(basename "$0")"
 
-# Skills installed from the Cloudflare plugin bundle — vendor content, not
-# personal config, so it stays out of the repo (cloudflare/ alone is 300+
-# files of reference docs).
-SKILL_EXCLUDES=(
-  agents-sdk
-  cloudflare
-  cloudflare-email-service
-  cloudflare-one
-  cloudflare-one-migrations
-  durable-objects
-  sandbox-sdk
-  turnstile-spin
-  workers-best-practices
-  wrangler
-  web-perf
-)
+# Cloudflare plugin skills are vendor content — see SYNC_COMMON_CLOUDFLARE_SKILLS.
+SKILL_EXCLUDES=("${SYNC_COMMON_CLOUDFLARE_SKILLS[@]}")
 
 # Top-level config files
 sync_common::sync_file "$SOURCE/CLAUDE.md"     "$DEST/CLAUDE.md"     "CLAUDE.md" || true
