@@ -27,6 +27,24 @@ INTERACTIVE=1
 PROMPT_ACTION=""
 DIFF_RESULT=0
 
+# Skills installed from the Cloudflare plugin bundle — vendor content, not
+# personal config, so they stay out of the repo (cloudflare/ alone is 300+
+# files of reference docs). The same bundle lands in both ~/.claude/skills and
+# ~/.config/opencode/skills, so both sync scripts exclude this one list.
+SYNC_COMMON_CLOUDFLARE_SKILLS=(
+  agents-sdk
+  cloudflare
+  cloudflare-email-service
+  cloudflare-one
+  cloudflare-one-migrations
+  durable-objects
+  sandbox-sdk
+  turnstile-spin
+  web-perf
+  workers-best-practices
+  wrangler
+)
+
 # Print usage and exit. Args: script_name, description.
 sync_common::usage() {
   local script_name="$1"
