@@ -1,6 +1,6 @@
 # pi Agent Instructions
 
-pi CLI + OpenCode CLI で並列開発を加速するためのエージェント仕様。OpenCode は pi のデフォルトモデルと異なる `openai/gpt-5.6-sol-pro` を使うため、設計相談で異モデルセカンドオピニオンとして機能する。
+pi CLI + OpenCode CLI で並列開発を加速するためのエージェント仕様。OpenCode は pi のデフォルトモデルと異なる `openai/gpt-5.6-sol` を使うため、設計相談で異モデルセカンドオピニオンとして機能する。
 
 ## DOCUMENTATION STRUCTURE
 
@@ -24,7 +24,7 @@ pi CLI + OpenCode CLI で並列開発を加速するためのエージェント�
 - Git 操作: `bash` ツールで直接実行
 - Linear 連携: MCP または `gh` CLI で代替
 - 外部リサーチは `web_search` / `web_fetch` ツール（`@ollama/pi-web-search` パッケージ）。pi は MCP 非対応のため、Claude Code 側の firecrawl MCP に相当する役割をこれが担う
-- 設計相談: OpenCode CLI（`opencode run -m openai/gpt-5.6-sol-pro "..."`、失敗時は `github-copilot/gpt-5.6-sol`）または `subagent` ツール（pi の defaultModel と OpenCode のモデルは別系統なので相互補完が活きる）
+- 設計相談: OpenCode CLI（`opencode run -m openai/gpt-5.6-sol "..."`、失敗時は `github-copilot/gpt-5.6-sol`）または `subagent` ツール（pi の defaultModel と OpenCode のモデルは別系統なので相互補完が活きる）
 
 ## pi 仕様メモ
 
