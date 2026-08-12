@@ -2,7 +2,7 @@
 name: team-review
 description: Review phase — 4 parallel reviewers (Claude / OpenCode / Security / Simplify), browser check or test execution. Called by /orchestrate with tier, task-file, linear-id.
 context: fork
-agent: Plan
+agent: general-purpose
 model: opus[1m]
 allowed-tools: Read, Write, Edit, Bash, Grep, Glob, Agent, Skill, AskUserQuestion, TodoWrite, mcp__linear-server__save_comment, mcp__linear-server__get_issue, mcp__agent-browser__navigate, mcp__agent-browser__screenshot, mcp__agent-browser__click, mcp__agent-browser__type
 ---
@@ -59,10 +59,19 @@ $ARGUMENTS の形式: "{task description} --tier={S|M|L} --task-file={TASK_FILE}
 - **Logic** — バグ・エッジケース・エラーハンドリング
 
 ### OpenCode Reviewer
+変更内容が長いのでプロンプトはファイルに落として渡す。
+`--agent plan` は必須・`2>/dev/null` は付けない・**バックグラウンド実行必須**（詳細は `rules/tool-routing.md` の「OpenCode リサーチの実行」）。
+
 ```bash
-opencode run -m openai/gpt-5.6-sol "以下のコード変更をレビューしてください。Quality / Logic の観点で問題点と改善提案を列挙してください。\n\n{変更ファイルの内容}" 2>/dev/null
-# Quota exceeded 等で失敗したら:
-opencode run -m github-copilot/gpt-5.6-sol "以下のコード変更をレビューしてください。Quality / Logic の観点で問題点と改善提案を列挙してください。\n\n{変更ファイルの内容}" 2>/dev/null
+opencode run --agent plan -m github-copilot/gpt-5.6-sol "$(cat {prompt_file})"
+```
+
+プロンプトの中身:
+```
+DO NOT USE ANY TOOLS.
+以下のコード変更をレビューしてください。Quality / Logic の観点で問題点と改善提案を列挙してください。
+
+{変更ファイルの内容}
 ```
 
 観点:
