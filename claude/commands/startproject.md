@@ -2,7 +2,7 @@
 name: startproject
 description: Project kickoff — understand codebase, research/design, create plan. Called by /orchestrate with tier, task-file, linear-id.
 context: fork
-agent: Plan
+agent: general-purpose
 model: opus[1m]
 allowed-tools: Read, Write, Edit, Bash, Grep, Glob, Agent, Skill, AskUserQuestion, SendMessage, TodoWrite, mcp__linear-server__save_comment, mcp__linear-server__get_issue
 ---
@@ -65,12 +65,12 @@ $ARGUMENTS の形式: "{task description} --tier={S|M|L} --task-file={TASK_FILE}
 OpenCode サブエージェントに設計相談:
 
 ```bash
-opencode run -m openai/gpt-5.6-sol "{question}" 2>/dev/null
-# Quota exceeded 等で失敗したら:
-opencode run -m github-copilot/gpt-5.6-sol "{question}" 2>/dev/null
+# --agent plan は必須。2>/dev/null は付けない。詳細は rules/tool-routing.md 参照
+opencode run --agent plan -m github-copilot/gpt-5.6-sol "{question}"
 ```
 
 - subagent_type: general-purpose
+- **バックグラウンド実行必須**（`run_in_background: true`）。込み入った質問は 10 分を超える
 - 得られた設計方針を TASK_FILE の `Design` セクションに書き込む
 
 ### tier=L
@@ -80,7 +80,7 @@ Researcher と Architect を **並列起動**し、双方向通信させる。
 | エージェント | ツール | 役割 |
 |---|---|---|
 | Researcher (一次情報) | firecrawl MCP | 公式ドキュメント・リリースノートを出典 URL 付きで調査 |
-| Researcher (実装知見) | OpenCode `openai/gpt-5.6-sol` | 設計上の勘所・落とし穴を調査（失敗時 `github-copilot/gpt-5.6-sol`） |
+| Researcher (実装知見) | OpenCode `--agent plan -m github-copilot/gpt-5.6-sol` | 設計上の勘所・落とし穴を調査 |
 | Architect | OpenCode CLI | 設計方針を策定し Claude Lead に報告 |
 
 両者はリアルタイムで発見を共有し、設計を相互に調整する。

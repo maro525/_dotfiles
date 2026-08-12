@@ -75,7 +75,7 @@ Any of the following automatically escalates to L:
 
 ### External Research (firecrawl MCP + OpenCode)
 
-外部リサーチは firecrawl MCP（一次情報）と OpenCode `openai/gpt-5.6-sol`（実装知見）を並列実行する。
+外部リサーチは firecrawl MCP（一次情報）と OpenCode `--agent plan -m github-copilot/gpt-5.6-sol`（実装知見）を並列実行する。
 
 | Tier | Usage |
 |------|-------------|
@@ -86,7 +86,7 @@ Any of the following automatically escalates to L:
 
 ### OpenCode Design Consultation
 
-設計相談も外部リサーチと同じモデルを使う: `openai/gpt-5.6-sol`（失敗時 `github-copilot/gpt-5.6-sol`）。
+設計相談も外部リサーチと同じ呼び出し形を使う: `opencode run --agent plan -m github-copilot/gpt-5.6-sol`（詳細は `rules/tool-routing.md`）。
 
 | Tier | OpenCode Usage |
 |------|------------|
