@@ -1,8 +1,7 @@
 {
   "defaultModel": "glm-5.3",
   "defaultProvider": "opencode-go",
-  "defaultThinkingLevel": "high",
-  "hideThinkingBlock": true,
+  "defaultThinkingLevel": "max",
   "lastChangelogVersion": "0.80.10",
   "packages": [
     "npm:pi-subagents",
