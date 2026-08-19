@@ -1,6 +1,6 @@
 {
-  "defaultModel": "accounts/fireworks/models/glm-5p2",
-  "defaultProvider": "fireworks",
+  "defaultModel": "glm-5.3",
+  "defaultProvider": "opencode-go",
   "defaultThinkingLevel": "high",
   "hideThinkingBlock": true,
   "lastChangelogVersion": "0.80.10",
