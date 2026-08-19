@@ -1,8 +1,7 @@
 {
-  "defaultModel": "accounts/fireworks/models/glm-5p2",
-  "defaultProvider": "fireworks",
-  "defaultThinkingLevel": "high",
-  "hideThinkingBlock": true,
+  "defaultModel": "glm-5.3",
+  "defaultProvider": "opencode-go",
+  "defaultThinkingLevel": "max",
   "lastChangelogVersion": "0.80.10",
   "packages": [
     "npm:pi-subagents",
