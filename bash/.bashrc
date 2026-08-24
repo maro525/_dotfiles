@@ -131,8 +131,6 @@ alias bat="batcat"
 
 eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
 
-eval "$(zoxide init bash)"
-
 # opencode
 export PATH=/home/dev/.opencode/bin:$PATH
 
@@ -164,5 +162,9 @@ case ":$PATH:" in
 esac
 # pnpm end
 
-PROMPT_COMMAND='printf "\033]0;%s\007" "${PWD##*/}"'
+# ターミナル (zellij / WezTerm 等) のタブ・ウィンドウタイトルをカレントディレクトリ名に強制設定 (OSC 0 エスケープシーケンス)。
+# CLAUDE_CODE_DISABLE_TERMINAL_TITLE で Claude Code によるタイトル上書きも抑止。
+# 注意: 代入で上書きすると zoxide / atuin が登録した PROMPT_COMMAND フックが消えて
+# cd 履歴が記録されなくなるため、必ず既存値への「追記」にすること。
+PROMPT_COMMAND="${PROMPT_COMMAND:+$PROMPT_COMMAND;}printf '\033]0;%s\007' \"\${PWD##*/}\""
 export CLAUDE_CODE_DISABLE_TERMINAL_TITLE=1
