@@ -16,8 +16,10 @@ HISTCONTROL=ignoreboth
 shopt -s histappend
 
 # for setting history length see HISTSIZE and HISTFILESIZE in bash(1)
-HISTSIZE=1000
-HISTFILESIZE=2000
+HISTSIZE=50000
+HISTFILESIZE=100000
+HISTTIMEFORMAT='%F %T '
+HISTIGNORE='ls:ll:cd:exit:history'
 
 # check the window size after each command and, if necessary,
 # update the values of LINES and COLUMNS.
@@ -25,7 +27,8 @@ shopt -s checkwinsize
 
 # If set, the pattern "**" used in a pathname expansion context will
 # match all files and zero or more directories and subdirectories.
-#shopt -s globstar
+# handy extras: autocd (type a dir name to cd), cdspell/dirspell (typo tolerance)
+shopt -s globstar autocd cdspell dirspell
 
 # make less more friendly for non-text input files, see lesspipe(1)
 [ -x /usr/bin/lesspipe ] && eval "$(SHELL=/bin/sh lesspipe)"
@@ -35,42 +38,7 @@ if [ -z "${debian_chroot:-}" ] && [ -r /etc/debian_chroot ]; then
     debian_chroot=$(cat /etc/debian_chroot)
 fi
 
-# set a fancy prompt (non-color, unless we know we "want" color)
-case "$TERM" in
-    xterm-color|*-256color) color_prompt=yes;;
-esac
-
-# uncomment for a colored prompt, if the terminal has the capability; turned
-# off by default to not distract the user: the focus in a terminal window
-# should be on the output of commands, not on the prompt
-#force_color_prompt=yes
-
-if [ -n "$force_color_prompt" ]; then
-    if [ -x /usr/bin/tput ] && tput setaf 1 >&/dev/null; then
-	# We have color support; assume it's compliant with Ecma-48
-	# (ISO/IEC-6429). (Lack of such support is extremely rare, and such
-	# a case would tend to support setf rather than setaf.)
-	color_prompt=yes
-    else
-	color_prompt=
-    fi
-fi
-
-if [ "$color_prompt" = yes ]; then
-    PS1='${debian_chroot:+($debian_chroot)}\[\033[01;32m\]\u@\h\[\033[00m\]:\[\033[01;34m\]\w\[\033[00m\]\$ '
-else
-    PS1='${debian_chroot:+($debian_chroot)}\u@\h:\w\$ '
-fi
-unset color_prompt force_color_prompt
-
-# If this is an xterm set the title to user@host:dir
-case "$TERM" in
-xterm*|rxvt*)
-    PS1="\[\e]0;${debian_chroot:+($debian_chroot)}\u@\h: \w\a\]$PS1"
-    ;;
-*)
-    ;;
-esac
+# NOTE: prompt (PS1) is set by starship at the bottom of this file
 
 # enable color support of ls and also add handy aliases
 if [ -x /usr/bin/dircolors ]; then
@@ -80,8 +48,6 @@ if [ -x /usr/bin/dircolors ]; then
     #alias vdir='vdir --color=auto'
 
     alias grep='grep --color=auto'
-    alias fgrep='fgrep --color=auto'
-    alias egrep='egrep --color=auto'
 fi
 
 # colored GCC warnings and errors
@@ -115,52 +81,52 @@ if ! shopt -oq posix; then
     . /etc/bash_completion
   fi
 fi
-eval "$(mise activate bash)"
-. "$HOME/.cargo/env"
+command -v mise >/dev/null && eval "$(mise activate bash)"
+[ -f "$HOME/.cargo/env" ] && . "$HOME/.cargo/env"
 
-eval "$(zoxide init bash)"
+command -v zoxide >/dev/null && eval "$(zoxide init bash)"
 
-export NVM_DIR="$HOME/.nvm"
-[ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
+if command -v eza >/dev/null; then
+    alias ls="eza -la --icons"
+    alias ll="eza -l --icons"
+    alias l="eza --icons"
+    alias lt="eza --tree --icons"
+fi
+command -v batcat >/dev/null && ! command -v bat >/dev/null && alias bat="batcat"
 
-alias ls="eza -la --icons"
-alias ll="eza -l --icons"
-alias l="eza --icons"
-alias lt="eza --tree --icons"
-alias bat="batcat"
-
-eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
-
-# opencode
-export PATH=/home/dev/.opencode/bin:$PATH
+[ -x /home/linuxbrew/.linuxbrew/bin/brew ] && eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
 
 # env
 # Secrets (LINEAR_API_KEY, GITHUB_PERSONAL_ACCESS_TOKEN, etc.) live in
 # ~/.bashrc.local, which is intentionally NOT committed to this repo.
 [[ -f ~/.bashrc.local ]] && source ~/.bashrc.local
 
-# Added by flyctl installer
-export FLYCTL_INSTALL="/home/dev/.fly"
-export PATH="$FLYCTL_INSTALL/bin:$PATH"
-
 # Disable bracketed paste mode
 bind 'set enable-bracketed-paste off'
 
 # starship
-eval "$(starship init bash)"
+command -v starship >/dev/null && eval "$(starship init bash)"
 
-. "$HOME/.atuin/bin/env"
+[ -f "$HOME/.atuin/bin/env" ] && . "$HOME/.atuin/bin/env"
 
-[[ -f ~/.bash-preexec.sh ]] && source ~/.bash-preexec.sh
-eval "$(atuin init bash)"
+if command -v atuin >/dev/null; then
+    [[ -f ~/.bash-preexec.sh ]] && source ~/.bash-preexec.sh
+    eval "$(atuin init bash)"
+fi
 
-# pnpm
-export PNPM_HOME="/home/dev/.local/share/pnpm"
-case ":$PATH:" in
-  *":$PNPM_HOME/bin:"*) ;;
-  *) export PATH="$PNPM_HOME/bin:$PATH" ;;
-esac
-# pnpm end
+# --- PATH additions (dedup-guarded) ---
+path_prepend() {
+    case ":$PATH:" in
+        *":$1:"*) ;;
+        *) export PATH="$1:$PATH" ;;
+    esac
+}
+path_prepend "$HOME/.local/share/pnpm/bin"   # pnpm
+export PNPM_HOME="$HOME/.local/share/pnpm"
+path_prepend "$HOME/.fly/bin"                # flyctl
+export FLYCTL_INSTALL="$HOME/.fly"
+path_prepend "$HOME/.opencode/bin"           # opencode
+unset -f path_prepend
 
 # ターミナル (zellij / WezTerm 等) のタブ・ウィンドウタイトルをカレントディレクトリ名に強制設定 (OSC 0 エスケープシーケンス)。
 # CLAUDE_CODE_DISABLE_TERMINAL_TITLE で Claude Code によるタイトル上書きも抑止。
