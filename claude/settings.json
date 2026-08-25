@@ -199,6 +199,43 @@
             "type": "command",
             "command": "python3 \"$HOME/.claude/hooks/agent-router.py\"",
             "timeout": 5
+          },
+          {
+            "type": "command",
+            "command": "\"$HOME/.claude/hooks/tmux-cc-status.sh\" busy"
+          }
+        ]
+      }
+    ],
+    "Notification": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$HOME/.claude/hooks/tmux-cc-status.sh\" notification"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$HOME/.claude/hooks/tmux-cc-status.sh\" idle"
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$HOME/.claude/hooks/tmux-cc-status.sh\" clear"
           }
         ]
       }
@@ -223,6 +260,7 @@
   "teammateMode": "in-process",
   "remoteControlAtStartup": true,
   "inputNeededNotifEnabled": true,
+  "preferredNotifChannel": "terminal_bell",
   "agentPushNotifEnabled": true,
   "skipAutoPermissionPrompt": true
 }

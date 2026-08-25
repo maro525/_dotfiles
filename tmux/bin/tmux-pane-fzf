@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+# Fuzzy-switch to any pane across all tmux sessions, with a live preview.
+# Bound to prefix + C-p via display-popup (see tmux.conf).
+set -euo pipefail
+
+# Fields are TAB-separated so that session names containing spaces stay intact
+# (tmux forbids ':' and '.' in session names, but allows spaces). Column widths
+# come from tmux's own #{pN:} padding, which left-aligns to at least N columns.
+# fzf strips trailing whitespace from {1}, so the padded target is usable as-is.
+# @cc carries the Claude Code state published by ~/.claude/hooks/tmux-cc-status.sh.
+readonly TARGET='#{session_name}:#{window_index}.#{pane_index}'
+readonly FORMAT="#{p24:${TARGET}}	#{p9:#{?@cc,#{@cc},-}}	#{p16:#{window_name}}	#{p12:#{pane_current_command}}	#{pane_current_path}"
+
+target=$(
+  tmux list-panes -a -F "$FORMAT" \
+    | fzf --reverse --ansi \
+          --delimiter=$'\t' \
+          --preview 'tmux capture-pane -ep -t {1}' \
+          --preview-window 'right:60%:wrap' \
+    | cut -d$'\t' -f1
+) || exit 0
+
+[[ -n "$target" ]] || exit 0
+target="${target%"${target##*[![:space:]]}"}"   # strip the padding
+
+# switch-client handles session + window; select-pane is applied separately
+# because switch-client ignores the pane part of the target.
+tmux switch-client -t "${target%.*}"
+tmux select-pane -t "$target"

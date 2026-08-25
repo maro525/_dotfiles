@@ -1,0 +1,26 @@
+#!/usr/bin/env bash
+# Jump to the first Claude Code pane that is waiting on the user.
+# Bound to prefix + C-w (see tmux.conf). The @cc pane option is published by
+# ~/.claude/hooks/tmux-cc-status.sh.
+#
+# approve outranks idle: a permission prompt is blocking progress, whereas an
+# idle pane is merely finished.
+set -euo pipefail
+
+# pane_id ('%12') is used as the target because it is globally unique and can
+# never contain whitespace — unlike session:window.pane, since tmux permits
+# spaces in session names.
+first_pane_with() {
+  tmux list-panes -a -F '#{@cc} #{pane_id}' | awk -v want="$1" '$1 == want { print $2; exit }'
+}
+
+target=$(first_pane_with approve)
+[[ -n "$target" ]] || target=$(first_pane_with idle)
+
+if [[ -z "$target" ]]; then
+  tmux display-message "No Claude pane is waiting"
+  exit 0
+fi
+
+tmux switch-client -t "$target"
+tmux select-pane -t "$target"
