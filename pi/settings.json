@@ -1,8 +1,9 @@
 {
   "defaultModel": "glm-5.3",
   "defaultProvider": "opencode-go",
-  "defaultThinkingLevel": "max",
-  "lastChangelogVersion": "0.80.10",
+  "defaultThinkingLevel": "high",
+  "hideThinkingBlock": true,
+  "lastChangelogVersion": "0.84.3",
   "packages": [
     "npm:pi-subagents",
     "npm:@ollama/pi-web-search",
