@@ -43,6 +43,8 @@
       "Bash(gh pr create:*)",
       "Bash(gh pr:*)",
       "Bash(gh run:*)",
+      "Bash(glab mr merge:*)",
+      "Bash(glab api:*)",
       "Bash(git switch main)",
       "Bash(git pull origin main)",
       "Bash(git add:*)",
