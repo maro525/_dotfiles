@@ -90,12 +90,13 @@ This file provides cross-cutting routing decisions.
 **これが唯一動く呼び出し形。他のファイルはこの節を参照する。**
 
 ```bash
-opencode run --agent plan -m github-copilot/gpt-5.6-sol "{research question}"
+opencode run --agent plan -m github-copilot/gpt-5.6-sol "{research question}" < /dev/null
 ```
 
 | 要素 | 理由（外すと壊れる） |
 |------|---------------------|
 | `--agent plan` **必須** | 既定の `build` エージェントは非対話実行だとパーミッション確認で**無言ハング**する（11 分無反応を実測）。stderr にも何も出ないので原因が分からない |
+| `< /dev/null` **必須** | stdin が**開いたパイプ**だと opencode は永久にハングする。`run_in_background: true` がまさにその状態を作る（フォアグラウンドの Bash 呼び出しには自動で付くが、バックグラウンドには付かない）。42 分と 12 分で kill された 2 回は stdout・stderr・ログすべて空。**下の「バックグラウンド実行必須」と必ずセットで使う** |
 | `2>/dev/null` を**付けない** | opencode はエラーを stderr に出しつつ **exit code 0** で終わる。潰すと「成功したのに出力が空」という紛らわしい結果になる |
 | `github-copilot/gpt-5.6-sol` が第一候補 | `openai/gpt-5.6-sol` は 2026-08-12 時点で `insufficient_quota` を返して**必ず失敗する**。一時的な超過ではなく残高切れ。課金が復活したら第一候補に戻す |
 | **バックグラウンド実行必須** | 込み入った質問は 10 分超。Bash ツールの既定 10 分では途中で kill されて出力ゼロになり、ハングと見分けがつかない |
@@ -103,7 +104,9 @@ opencode run --agent plan -m github-copilot/gpt-5.6-sol "{research question}"
 
 - 長文プロンプトはファイルに落として `"$(cat prompt.txt)"` で渡す
 - ツール呼び出しで止まらせたくない場合はプロンプト冒頭に `DO NOT USE ANY TOOLS` と書く
-- 空出力を見たら quota と決めつけない。ログは `~/.local/share/opencode/log/` に 1 セッション 1 ファイル。`service=vcs` / `service=snapshot` のどちらで止まったかを見る
+- 空出力を見たら quota と決めつけない。ログは `~/.local/share/opencode/log/` に 1 セッション 1 ファイル。
+  正常なセッションは `service=session id=` → `POST /session` → `service=snapshot hash=` → `resolveTools` →
+  `service=llm … stream` と進む。**`service=vcs … initialized` の後で止まっていれば stdin 詰まり**（`< /dev/null` を付け忘れ）で、cwd が非 git のときと同じ見た目になる
 - 疎通確認は `opencode run --agent plan -m <model> "Reply with exactly: PONG"`（数十秒で返る）
 - サブエージェント経由で実行し、メインコンテキストを汚さない
 - OpenCode はコードを実際に読まずに答えることがある。結論は採用してよいが**根拠は必ず自分で検証する**
@@ -151,9 +154,9 @@ Task tool parameters:
 - prompt: |
     Run OpenCode research on: {topic}
 
-    opencode run --agent plan -m github-copilot/gpt-5.6-sol "{research question}"
+    opencode run --agent plan -m github-copilot/gpt-5.6-sol "{research question}" < /dev/null
 
-    Keep `--agent plan` and do NOT append 2>/dev/null — see
+    Keep `--agent plan` and the `< /dev/null`, and do NOT append 2>/dev/null — see
     "OpenCode リサーチの実行" in rules/tool-routing.md for why.
     Expect this to take over 10 minutes.
 
@@ -358,7 +361,7 @@ firecrawl_search: "Check the latest stable versions and known issues for: {packa
 → 公式ドキュメント / リリースノートは firecrawl_scrape で本文を取得
 
 opencode run --agent plan -m github-copilot/gpt-5.6-sol "{same question}"
-→ `--agent plan` と「2>/dev/null を付けない」は必須。理由は「OpenCode リサーチの実行」参照
+→ `--agent plan` / `< /dev/null` / 「2>/dev/null を付けない」は必須。理由は「OpenCode リサーチの実行」参照
 → バージョン番号など「現在の事実」は firecrawl の結果を正とする
 ```
 
