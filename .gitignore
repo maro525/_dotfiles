@@ -3,3 +3,9 @@
 # Local secret overrides — never commit these.
 bash/.bashrc.local
 *.local
+
+# Cline — credential-bearing files. Never synced by sync-cline.sh, but keep a
+# second line of defence in case one is ever copied in by hand.
+cline/secrets.json
+cline/providers.json
+cline/config.json

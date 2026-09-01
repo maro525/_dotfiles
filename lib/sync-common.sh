@@ -1,5 +1,5 @@
 #!/bin/bash
-# Shared sync helpers for sync-pi.sh / sync-claude.sh / sync-opencode.sh.
+# Shared sync helpers for sync-pi.sh / sync-claude.sh / sync-opencode.sh / sync-cline.sh.
 #
 # Provides:
 #   - Interactive diff + a/p/h/H/s/d/q prompt for syncing HOME <-> repo
@@ -29,8 +29,9 @@ DIFF_RESULT=0
 
 # Skills installed from the Cloudflare plugin bundle — vendor content, not
 # personal config, so they stay out of the repo (cloudflare/ alone is 300+
-# files of reference docs). The same bundle lands in both ~/.claude/skills and
-# ~/.config/opencode/skills, so both sync scripts exclude this one list.
+# files of reference docs). The same bundle lands in ~/.claude/skills,
+# ~/.config/opencode/skills and ~/.cline/skills, so all three sync scripts
+# exclude this one list.
 SYNC_COMMON_CLOUDFLARE_SKILLS=(
   agents-sdk
   cloudflare
