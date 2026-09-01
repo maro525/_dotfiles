@@ -13,6 +13,7 @@ config.use_ime = true
 config.color_scheme = 'Materia (base16)'
 config.window_close_confirmation = 'AlwaysPrompt'
 config.enable_scroll_bar = true
+config.copy_on_select = true
 config.initial_rows = 60
 config.initial_cols = 100
 config.default_cursor_style = 'BlinkingUnderline'
