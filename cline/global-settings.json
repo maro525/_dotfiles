@@ -1,0 +1,9 @@
+{
+  "autoUpdateEnabled": true,
+  "telemetryOptOut": false,
+  "tools": {
+    "web_search": {
+      "enabled": true
+    }
+  }
+}
