@@ -43,10 +43,10 @@ This file provides cross-cutting routing decisions.
 
 | スキル | 直接実行する操作 |
 |--------|----------------|
-| `/team-implement` | git checkout/branch、ruff、pytest、uv、Linear MCP |
-| `/team-review` | git diff/log、pytest、ruff、Linear MCP |
+| `/team-implement` | git checkout/branch、ruff、pytest、uv |
+| `/team-review` | git diff/log、pytest、ruff |
 | `/fs-ops` | mkdir、rm、cp、mv、chmod、ln、touch |
-| `/deploy` | git push、gh pr create、git checkout、Linear MCP |
+| `/deploy` | git push、gh pr create、git checkout |
 
 ## Adaptive Execution Override
 
@@ -281,19 +281,21 @@ Ad-hoc Git モードでは、操作を **Push-type（書き込み）** と **Pul
 
 ## Linear ステータス遷移
 
-**各スキルが Linear タスクのステータスを適切なタイミングで変更する。**
+**Linear への書き込み（コメント投稿・ステータス変更）は `/orchestrate` が一元的に行う。**
+`/startproject` `/team-implement` `/team-review` `/deploy` は投稿本文を OUTPUT で返すだけで、
+自分では Linear に書き込まない（allowed-tools からも Linear 書き込み系ツールを外してある）。
 
-| スキル | タイミング | ステータス変更 |
-|--------|----------|--------------|
-| `/team-implement` | Step 0（実装開始時） | → "In Progress" |
-| `/team-review` | Step 0（レビュー開始時） | → "In Progress" |
-| `/deploy` | Step 5-2（デプロイ完了後） | → "In Review" |
+| タイミング | ステータス変更 | 実行者 |
+|----------|--------------|--------|
+| STEP 4-1（実装開始時） | → "In Progress" | `/orchestrate` |
+| STEP 6-3（デプロイ完了後） | → "In Review" | `/orchestrate` |
 
 ## GitHub / Linear MCP Operations
 
 ### `context: fork` スキル内
 
-`/team-implement`, `/team-review`, `/deploy` はスキル内で git コマンドによる情報取得 + Linear MCP を直接実行する。
+`/team-implement`, `/team-review`, `/deploy` はスキル内で git コマンドを直接実行する。
+Linear MCP の書き込みは行わず、`/orchestrate` が代行する（「Linear ステータス遷移」参照）。
 
 ### アドホック操作
 
