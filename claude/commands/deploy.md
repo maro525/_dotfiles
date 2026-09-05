@@ -1,17 +1,23 @@
 ---
 name: deploy
-description: Deploy phase — push feature branch, create PR, update Linear. Called by /orchestrate with tier, task-file, linear-id.
+description: Deploy phase — push feature branch, create PR, return a deploy payload. The caller writes TASK_FILE and updates Linear. Called by /orchestrate with tier, task-file, linear-id.
 context: fork
 agent: general-purpose
 model: haiku
 color: orange
-allowed-tools: Read, Write, Edit, Bash, Grep, Glob, AskUserQuestion, TodoWrite, mcp__linear-server__save_comment, mcp__linear-server__get_issue, mcp__linear-server__save_issue, mcp__linear-server__list_issue_statuses, mcp__agent-browser__navigate, mcp__agent-browser__screenshot, mcp__agent-browser__click, mcp__agent-browser__type
+allowed-tools: Read, Write, Edit, Bash, Grep, Glob, AskUserQuestion, TodoWrite, mcp__linear-server__get_issue, mcp__agent-browser__navigate, mcp__agent-browser__screenshot, mcp__agent-browser__click, mcp__agent-browser__type
 ---
 
 # deploy
 
-デプロイフェーズを担当。
-タスクファイル・Decision Log・Linear・Don't-Ask の共通ルールは CLAUDE.md 参照。
+デプロイフェーズを担当。push / PR・MR 作成・デプロイ後検証は自分で行う。
+
+**TASK_FILE への書き込みと Linear への投稿・ステータス変更は行わない。**
+結果は OUTPUT フォーマットで呼び出し元（`/orchestrate` STEP 6）に返し、
+TASK_FILE の更新・Linear コメント投稿・ステータス変更は呼び出し元が行う。
+TASK_FILE は Read のみ（`Brief` / `Review` / `Implementation Notes` の参照用）。
+
+Don't-Ask 等の共通ルールは CLAUDE.md 参照。
 
 前提: feature ブランチ作成済み・/team-review 完了済み・PASS 判定済み。
 
@@ -158,57 +164,56 @@ git checkout {original-branch}
 
 ---
 
-## STEP 6: RECORD & POST
+## STEP 6: OUTPUT を返す
 
-**[MUST] 以下を必ずこの順番で実行する。**
+**TASK_FILE には書き込まない。Linear にも投稿しない。**
+以下のフォーマットを最終レスポンスとしてそのまま返す。
+呼び出し元（`/orchestrate` STEP 6-2 / 6-3）が TASK_FILE と Linear へ反映する。
 
-### 6-1. Linear にデプロイ完了コメントを投稿
+```markdown
+### DEPLOY
 
-`mcp__linear-server__save_comment` で LINEAR_ID に以下を含むコメントを投稿:
+#### デプロイ結果: SUCCESS
+
+#### 実行内容
+- デプロイ日時: {timestamp}
+- feature ブランチ: feature/{feature-name}
+- PR/MR: {PR/MR URL}
+
+#### デプロイ後検証結果
+
+##### ブラウザ確認（該当する場合）
+- 確認した URL・ページ
+- 問題点（あれば）
+
+##### スモークテスト（該当する場合）
+- 実行コマンド
+- 結果
+
+#### 申し送り事項
+- 次タスクへの注意点
+- team-review の minor 指摘（対応推奨）
+
+### DECISION_LOG
+- [deploy] POST: ...
+
+### LINEAR_COMMENT
+（Linear に投稿するデプロイ完了コメント本文。以下を含める）
 - feature ブランチ URL
 - コミット履歴（`git log --oneline` の出力）
 - team-review の結果サマリー
 - PR/MR リンク
 
-### 6-2. Linear ステータスを "In Review" に変更
-
-```
-1. mcp__linear-server__list_issue_statuses で利用可能なステータス一覧を取得
-2. "In Review" に該当するステータス ID を特定
-3. mcp__linear-server__save_issue でステータスを更新
+### LINEAR_STATUS
+In Review
 ```
 
-### 6-3. タスクファイルを更新
-
-TASK_FILE の `Deploy` セクションに以下を記入する:
-
-```markdown
-## Deploy
-
-### デプロイ結果: SUCCESS
-
-### 実行内容
-- デプロイ日時: {timestamp}
-- feature ブランチ: feature/{feature-name}
-- PR/MR: {PR/MR URL}
-
-### デプロイ後検証結果
-
-#### ブラウザ確認（該当する場合）
-- 確認した URL・ページ
-- 問題点（あれば）
-
-#### スモークテスト（該当する場合）
-- 実行コマンド
-- 結果
-
-### 申し送り事項
-- 次タスクへの注意点
-- team-review の minor 指摘（対応推奨）
-```
-
-TASK_FILE の `Meta` の `status` を `completed` に更新する。
-TASK_FILE の `Decision Log` に `[deploy] POST` エントリを追加する。
+| OUTPUT セクション | 呼び出し元での反映先 |
+|---|---|
+| `DEPLOY` | TASK_FILE の `Deploy` セクション（見出しレベルはそのまま貼れる） |
+| `DECISION_LOG` | TASK_FILE の `Decision Log` に追記 |
+| `LINEAR_COMMENT` | Linear に投稿 |
+| `LINEAR_STATUS` | Linear のステータスを変更 |
 
 ---
 
@@ -222,7 +227,7 @@ TASK_FILE の `Decision Log` に `[deploy] POST` エントリを追加する。
 - feature ブランチ: feature/{feature-name}
 - PR/MR: {PR/MR URL}
 - 現在のブランチ: {current-branch}
-- Linear: {LINEAR_ID} → In Review
+- Linear: {LINEAR_ID} → In Review（ステータス変更は orchestrator が実行）
 ```
 
 ---
