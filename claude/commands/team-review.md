@@ -1,17 +1,23 @@
 ---
 name: team-review
-description: Review phase — 4 parallel reviewers (Claude / OpenCode / Security / Simplify), browser check or test execution. Called by /orchestrate with tier, task-file, linear-id.
+description: Review phase — 4 parallel reviewers (Claude / OpenCode / Security / Simplify), browser check or test execution; returns a review payload. The caller writes TASK_FILE and posts to Linear. Called by /orchestrate with tier, task-file, linear-id.
 context: fork
 agent: general-purpose
 model: opus
 color: yellow
-allowed-tools: Read, Write, Edit, Bash, Grep, Glob, Agent, Skill, AskUserQuestion, TodoWrite, mcp__linear-server__save_comment, mcp__linear-server__get_issue, mcp__agent-browser__navigate, mcp__agent-browser__screenshot, mcp__agent-browser__click, mcp__agent-browser__type
+allowed-tools: Read, Write, Edit, Bash, Grep, Glob, Agent, Skill, AskUserQuestion, TodoWrite, mcp__linear-server__get_issue, mcp__agent-browser__navigate, mcp__agent-browser__screenshot, mcp__agent-browser__click, mcp__agent-browser__type
 ---
 
 # team-review
 
 レビューフェーズを担当。
-タスクファイル・Decision Log・Linear・Don't-Ask の共通ルールは CLAUDE.md 参照。
+
+**TASK_FILE への書き込みと Linear への投稿は行わない。**
+レビュー結果は OUTPUT フォーマットで呼び出し元（`/orchestrate` STEP 5）に返し、
+TASK_FILE の更新・Linear コメント投稿は呼び出し元が行う。
+TASK_FILE は Read のみ（`Brief` / `Design` / `Implementation Notes` の参照用）。
+
+Don't-Ask 等の共通ルールは CLAUDE.md 参照。
 
 ## Input
 
@@ -172,50 +178,62 @@ Skill: simplify
 
 ## OUTPUT
 
-TASK_FILE の `Review` セクションに以下を記入する。
+**TASK_FILE には書き込まない。Linear にも投稿しない。**
+以下のフォーマットを最終レスポンスとしてそのまま返す。
+呼び出し元（`/orchestrate` STEP 5-2 / 5-3）が TASK_FILE と Linear へ反映する。
 
 ```markdown
-## Review
+### VERDICT
+PASS | FAIL
 
-### 判定: PASS / FAIL
+### REVIEW
 
-### コードレビュー統合結果
+#### コードレビュー統合結果
 
-#### Claude Reviewer
+##### Claude Reviewer
 - [severity] 指摘内容
 
-#### OpenCode Reviewer
+##### OpenCode Reviewer
 - [severity] 指摘内容
 
-#### Security Reviewer
+##### Security Reviewer
 - [severity] 指摘内容（security.md ルール参照）
 
-#### Simplify Reviewer
+##### Simplify Reviewer
 - [severity] 指摘内容
 
-#### 統合サマリー
+##### 統合サマリー
 - 複数レビュアー共通の指摘（severity 引き上げ）
 - 個別の指摘
 
-### 動作検証結果
+#### 動作検証結果
 
-#### ブラウザ表示確認（該当する場合）
+##### ブラウザ表示確認（該当する場合）
 - 確認したページ・状態
 - 問題点（あれば）
 
-#### テスト実行結果（該当する場合）
+##### テスト実行結果（該当する場合）
 - 実行コマンド
 - 結果サマリー
 - 失敗したテスト（あれば）
 
-### 申し送り事項（minor）
+#### 申し送り事項（minor）
 - deploy フェーズへの注意点
 - リファクタリング推奨（次タスクで対応）
+
+### DECISION_LOG
+- [team-review] POST: ...
+
+### LINEAR_COMMENT
+（Linear に投稿するレビュー結果コメント本文。PASS/FAIL + サマリー）
 ```
 
-**[MUST]** Linear にコメントを投稿する。
-- `mcp__linear-server__save_comment` で LINEAR_ID にレビュー結果（PASS/FAIL + サマリー）を投稿
-- TASK_FILE の `Decision Log` に `[team-review] POST` エントリを追加
+| OUTPUT セクション | 呼び出し元での反映先 |
+|---|---|
+| `VERDICT` | Gate 3 の判定に使用 |
+| `REVIEW` | TASK_FILE の `Review` セクション（見出しレベルはそのまま貼れる） |
+| `DECISION_LOG` | TASK_FILE の `Decision Log` に追記 |
+| `LINEAR_COMMENT` | Linear に投稿 |
 
 ---
 
