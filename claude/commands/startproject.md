@@ -3,7 +3,8 @@ name: startproject
 description: Project kickoff — understand codebase, research/design, create plan. Called by /orchestrate with tier, task-file, linear-id.
 context: fork
 agent: general-purpose
-model: opus[1m]
+model: best
+color: red
 allowed-tools: Read, Write, Edit, Bash, Grep, Glob, Agent, Skill, AskUserQuestion, SendMessage, TodoWrite, mcp__linear-server__save_comment, mcp__linear-server__get_issue
 ---
 
