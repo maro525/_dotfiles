@@ -51,9 +51,13 @@ Any of the following automatically escalates to L:
 | Tier | Phase 1 (Understand) | Phase 2 (Research & Design) | Phase 3 (Plan) |
 |------|---------------------|---------------------------|----------------|
 | **XS** | Skip /startproject entirely | - | - |
-| **S** | Codebase read + brief | Skip (no Agent Teams) | Simple task list |
-| **M** | Codebase read + brief | OpenCode subagent only (no team) | Task list + design |
-| **L** | Full codebase analysis | Agent Teams (Researcher + Architect) | Full plan |
+| **S** | Codebase read + brief | Skip | Simple task list |
+| **M** | Codebase read + brief | OpenCode consultation only (no team) | Task list + design |
+| **L** | Full codebase analysis | firecrawl MCP + OpenCode を並列実行 | Full plan |
+
+> `/startproject` は `agent: Plan`（読み取り専用）で動く。Write / Edit / Agent を持たないため、
+> リサーチは Bash・MCP から直接実行し、teammate は起動しない。
+> 成果物は OUTPUT として `/orchestrate` に返し、TASK_FILE への書き込みと Linear 投稿は `/orchestrate` が行う。
 
 ### /team-implement
 
@@ -82,7 +86,7 @@ Any of the following automatically escalates to L:
 | **XS** | Never |
 | **S** | Never |
 | **M** | Only if task involves unknown libraries or external APIs |
-| **L** | Standard (Researcher teammate or subagent) |
+| **L** | Standard（`/startproject` 内は Agent ツールが無いため直接実行。それ以外はサブエージェント経由） |
 
 ### OpenCode Design Consultation
 
@@ -93,7 +97,7 @@ Any of the following automatically escalates to L:
 | **XS** | Never |
 | **S** | Only if debugging a non-obvious issue |
 | **M** | Subagent for design questions |
-| **L** | Agent Teams (Architect teammate) or subagent |
+| **L** | `/startproject` 内は Bash から直接実行。それ以外はサブエージェント経由 |
 
 ## Escalation
 
