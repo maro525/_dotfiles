@@ -1,17 +1,23 @@
 ---
 name: team-implement
-description: Implementation phase — read design, implement code, write to task file. Called by /orchestrate with tier, task-file, linear-id.
+description: Implementation phase — read design, implement code, return an implementation payload. The caller writes TASK_FILE and posts to Linear. Called by /orchestrate with tier, task-file, linear-id.
 context: fork
 agent: general-purpose
 model: best
 color: blue
-allowed-tools: Read, Write, Edit, Bash, Grep, Glob, Agent, Skill, AskUserQuestion, SendMessage, TodoWrite, mcp__linear-server__save_comment, mcp__linear-server__get_issue
+allowed-tools: Read, Write, Edit, Bash, Grep, Glob, Agent, Skill, AskUserQuestion, SendMessage, TodoWrite, mcp__linear-server__get_issue
 ---
 
 # team-implement
 
-実装フェーズを担当。
-タスクファイル・Decision Log・Linear・Don't-Ask の共通ルールは CLAUDE.md 参照。
+実装フェーズを担当。コード（実装・テスト）の読み書きと git 操作は自分で行う。
+
+**TASK_FILE への書き込みと Linear への投稿は行わない。**
+実装結果は OUTPUT フォーマットで呼び出し元（`/orchestrate` STEP 4）に返し、
+TASK_FILE の更新・Linear コメント投稿・ステータス変更は呼び出し元が行う。
+TASK_FILE は Read のみ（`Brief` / `Design` / `Decision Log` の参照用）。
+
+Don't-Ask 等の共通ルールは CLAUDE.md 参照。
 
 ## Input
 
@@ -34,7 +40,7 @@ $ARGUMENTS の形式: "{task description} --tier={S|M|L} --task-file={TASK_FILE}
 1. TASK_FILE の `Brief` セクション — プロジェクト概要・スコープ・成功基準
 2. TASK_FILE の `Design` セクション（tier=M,L）— 設計方針・アーキテクチャ決定
 3. TASK_FILE の `Decision Log` — これまでの意思決定
-4. `TodoWrite` のタスクリスト — startproject が作成した実装タスク
+4. orchestrator から渡された実装タスクリスト（startproject の `PLAN`）
 
 ---
 
@@ -47,7 +53,7 @@ Claude Lead が直接実装する。
 
 - feature ブランチを作成して作業
 - テストを書いてから実装（TDD）
-- 完了後に TASK_FILE の `Implementation Notes` に記録
+- 完了後に OUTPUT の `IMPLEMENTATION_NOTES` にまとめる
 
 ### tier=M
 Claude Lead が直接実装 or 1-2 サブエージェントに委譲。
@@ -55,7 +61,7 @@ Claude Lead が直接実装 or 1-2 サブエージェントに委譲。
 - feature ブランチを作成して作業
 - モジュールが独立している場合はサブエージェントに並列実装させる
 - 各サブエージェントの成果を Claude Lead がレビュー・統合
-- 完了後に TASK_FILE の `Implementation Notes` に記録
+- 完了後に OUTPUT の `IMPLEMENTATION_NOTES` にまとめる
 
 ### tier=L
 フルチームでモジュール単位のオーナーシップ制。
@@ -64,7 +70,7 @@ Claude Lead が直接実装 or 1-2 サブエージェントに委譲。
 - Claude Lead がモジュールを分割し、各サブエージェントにアサイン
 - 各サブエージェントは担当モジュールの実装・テストまで完結させる
 - サブエージェント間の依存は Claude Lead が調整
-- 完了後に TASK_FILE の `Implementation Notes` に記録
+- 完了後に OUTPUT の `IMPLEMENTATION_NOTES` にまとめる
 
 ---
 
@@ -88,36 +94,50 @@ Claude Lead が直接実装 or 1-2 サブエージェントに委譲。
 
 - [ ] TodoWrite のタスクリストがすべて完了
 - [ ] テストがすべて通過
-- [ ] TASK_FILE の `Implementation Notes` セクションが記入済み
+- [ ] OUTPUT の `IMPLEMENTATION_NOTES` が記入済み
 
 ---
 
 ## OUTPUT
 
-TASK_FILE の `Implementation Notes` に以下を記入する。
+**TASK_FILE には書き込まない。Linear にも投稿しない。**
+以下のフォーマットを最終レスポンスとしてそのまま返す。
+呼び出し元（`/orchestrate` STEP 4-3 / 4-4）が TASK_FILE と Linear へ反映する。
 
 ```markdown
-## Implementation Notes
+### IMPLEMENTATION_NOTES
 
-### 実装サマリー
+#### 実装サマリー
 - 実装したモジュール・ファイル一覧
 - 主要な実装判断とその理由
 
-### 変更ファイル
+#### 変更ファイル
 - path/to/file.ts — 変更内容の概要
 - ...
 
-### テスト
+#### テスト
 - テストファイルの場所
 - カバレッジの概要
 
-### 残課題・注意点
+#### 残課題・注意点
 - レビュアーへの申し送り事項
+
+### DECISION_LOG
+- [team-implement] POST: ...
+
+### LINEAR_COMMENT
+（Linear に投稿する実装完了コメント本文）
+
+### BRANCH
+feature/{feature-name}
 ```
 
-**[MUST]** Linear にコメントを投稿する。
-- `mcp__linear-server__save_comment` で LINEAR_ID に実装完了コメントを投稿
-- TASK_FILE の `Decision Log` に `[team-implement] POST` エントリを追加
+| OUTPUT セクション | 呼び出し元での反映先 |
+|---|---|
+| `IMPLEMENTATION_NOTES` | TASK_FILE の `Implementation Notes` セクション |
+| `DECISION_LOG` | TASK_FILE の `Decision Log` に追記 |
+| `LINEAR_COMMENT` | Linear に投稿 |
+| `BRANCH` | STEP 5 / STEP 6 へ引き渡し |
 
 ---
 

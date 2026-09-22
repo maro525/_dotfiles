@@ -115,13 +115,13 @@ feature は LINEAR_ID のタスク内容から短いスネークケースで命�
 - status: planning
 
 ## Brief
-<!-- startproject が記入 -->
+<!-- orchestrator が startproject の返却 BRIEF から記入 -->
 
 ## Decision Log
 <!-- 各 command が追記 -->
 
 ## Design
-<!-- startproject (tier=M,L) が記入。tier=S は空欄でよい -->
+<!-- orchestrator が startproject の返却 DESIGN から記入（tier=M,L）。tier=S は空欄でよい -->
 
 ## Implementation Notes
 <!-- team-implement が記入 -->
@@ -139,23 +139,60 @@ feature は LINEAR_ID のタスク内容から短いスネークケースで命�
 
 **tier=S,M,L のみ実行。**
 
+### 3-1. 実行
+
 ```
 /startproject "{task description} --tier={tier} --task-file={TASK_FILE} --linear-id={LINEAR_ID}"
 ```
 
-startproject 内で質問が発生した場合はユーザーが回答する。
-回答後は startproject が続行し、計画が完成したら Gate 1 へ。
+startproject は `agent: Plan` の**読み取り専用**コマンドで、自分ではファイルを書かず Linear にも投稿しない。
+計画一式を OUTPUT フォーマット（`BRIEF` / `DECISION_LOG` / `DESIGN` / `CLAUDE_MD_CURRENT_PROJECT` / `PLAN` / `LINEAR_COMMENT` / `GATE1`）で返してくる。
 
-**Gate 1:** startproject が自己判断して発動する（詳細は startproject.md 参照）。
-- 自動承認の場合 → 即 STEP 4 へ進む
-- Gate 1 発動の場合 → startproject がユーザーに承認を求める。承認後即 STEP 4 へ進む
-- 差し戻しの場合 → startproject がフィードバックをもとに計画を修正して再提示
+startproject 内で質問が発生した場合はユーザーが回答する。
+回答後は startproject が続行し、計画が完成したら返却される。
+
+### 3-2. **[MUST]** 返却内容を書き込む
+
+**orchestrator が実行する。startproject は Write / Edit を持たないため実行できない。**
+
+| OUTPUT セクション | 書き込み先 | tier |
+|---|---|---|
+| `BRIEF` | TASK_FILE の `Brief` セクション | 全 tier |
+| `DECISION_LOG` | TASK_FILE の `Decision Log` に追記 | 全 tier |
+| `DESIGN` | TASK_FILE の `Design` セクション | M, L（S は N/A） |
+| `CLAUDE_MD_CURRENT_PROJECT` | プロジェクトの `CLAUDE.md` に Current Project セクションを追加 | 全 tier |
+| `PLAN` | 変数として保持し STEP 4 へ引き渡す | 全 tier |
+
+返却が OUTPUT フォーマットに従っていない場合は、startproject に整形し直させてから書き込む。
+
+### 3-3. **[MUST]** Linear にコメントを投稿する
+
+`mcp__linear-server__save_comment` で LINEAR_ID に `LINEAR_COMMENT` の本文を投稿する。
+投稿できなかった場合はユーザーに報告する（無言でスキップしない）。
+
+### 3-4. Gate 1
+
+startproject が自己判断して発動する（詳細は startproject.md 参照）。返却の `GATE1` で判別する。
+
+- `auto-approved` → 即 STEP 4 へ進む
+- `approved` → startproject 内で承認済み。即 STEP 4 へ進む
+- `revised` → 修正後の計画。内容を確認して STEP 4 へ進む
 
 ---
 
 ## STEP 4: team-implement を実行
 
 **全 tier で実行。完了次第即 STEP 5 へ進む。**
+
+### 4-1. Linear ステータスを "In Progress" に変更
+
+```
+1. mcp__linear-server__list_issue_statuses で利用可能なステータス一覧を取得
+2. "In Progress" に該当するステータス ID を特定
+3. mcp__linear-server__save_issue でステータスを更新
+```
+
+### 4-2. 実行
 
 ```
 /team-implement "{task description} --tier={tier} --task-file={TASK_FILE} --linear-id={LINEAR_ID}"
@@ -168,13 +205,33 @@ startproject 内で質問が発生した場合はユーザーが回答する。
 | M | feature ブランチ。Claude 直接 or 1-2 サブエージェント |
 | L | feature ブランチ。フルチーム（モジュール単位オーナーシップ） |
 
-**Gate 2 (内部確認):** TASK_FILE の `Implementation Notes` が埋まっていることを確認してから STEP 5 へ。
+team-implement はコードと git 操作のみ行い、**TASK_FILE への書き込みと Linear 投稿は行わない**。
+結果を OUTPUT フォーマット（`IMPLEMENTATION_NOTES` / `DECISION_LOG` / `LINEAR_COMMENT` / `BRANCH`）で返してくる。
+
+### 4-3. **[MUST]** 返却内容を書き込む
+
+| OUTPUT セクション | 書き込み先 |
+|---|---|
+| `IMPLEMENTATION_NOTES` | TASK_FILE の `Implementation Notes` セクション |
+| `DECISION_LOG` | TASK_FILE の `Decision Log` に追記 |
+| `BRANCH` | 変数として保持し STEP 5 / STEP 6 へ引き渡す |
+
+### 4-4. **[MUST]** Linear にコメントを投稿する
+
+`mcp__linear-server__save_comment` で LINEAR_ID に `LINEAR_COMMENT` の本文を投稿する。
+投稿できなかった場合はユーザーに報告する（無言でスキップしない）。
+
+### Gate 2（内部確認）
+
+TASK_FILE の `Implementation Notes` が 4-3 で埋まっていることを確認してから STEP 5 へ進む。
 
 ---
 
 ## STEP 5: team-review を実行
 
 **tier=XS はスキップして即 STEP 6 へ。**
+
+### 5-1. 実行
 
 ```
 /team-review "{task description} --tier={tier} --task-file={TASK_FILE} --linear-id={LINEAR_ID}"
@@ -187,11 +244,30 @@ startproject 内で質問が発生した場合はユーザーが回答する。
 | M | 2レビュアー（Claude + OpenCode） |
 | L | 4レビュアー（Claude / OpenCode / Security / Simplify） |
 
-**Gate 3:**
-- PASS → 即 STEP 6 へ進む
-- FAIL → ユーザーに報告し判断を待つ。team-implement に戻るか確認する
+team-review は **TASK_FILE への書き込みと Linear 投稿を行わない**。
+結果を OUTPUT フォーマット（`VERDICT` / `REVIEW` / `DECISION_LOG` / `LINEAR_COMMENT`）で返してくる。
 
-**DONT-ASK MODE:** FAIL 時は自動で team-implement に戻り1回リトライする。
+### 5-2. **[MUST]** 返却内容を書き込む
+
+| OUTPUT セクション | 書き込み先 |
+|---|---|
+| `REVIEW` | TASK_FILE の `Review` セクション |
+| `DECISION_LOG` | TASK_FILE の `Decision Log` に追記 |
+
+**FAIL の場合も必ず書き込む**（差し戻し履歴を残すため）。
+
+### 5-3. **[MUST]** Linear にコメントを投稿する
+
+`mcp__linear-server__save_comment` で LINEAR_ID に `LINEAR_COMMENT` の本文を投稿する。
+
+### 5-4. Gate 3
+
+返却の `VERDICT` で判別する。
+
+- `PASS` → 即 STEP 6 へ進む
+- `FAIL` → ユーザーに報告し判断を待つ。team-implement に戻るか確認する
+
+**DONT-ASK MODE:** FAIL 時は自動で STEP 4 に戻り1回リトライする。
 
 ---
 
@@ -199,8 +275,28 @@ startproject 内で質問が発生した場合はユーザーが回答する。
 
 **全 tier で実行。完了次第即 STEP 7 へ進む。**
 
+### 6-1. 実行
+
 ```
 /deploy "{task description} --tier={tier} --task-file={TASK_FILE} --linear-id={LINEAR_ID}"
+```
+
+deploy は push / PR・MR 作成 / デプロイ後検証のみ行い、**TASK_FILE への書き込みと Linear 操作は行わない**。
+結果を OUTPUT フォーマット（`DEPLOY` / `DECISION_LOG` / `LINEAR_COMMENT` / `LINEAR_STATUS`）で返してくる。
+
+### 6-2. **[MUST]** 返却内容を書き込む
+
+| OUTPUT セクション | 書き込み先 |
+|---|---|
+| `DEPLOY` | TASK_FILE の `Deploy` セクション |
+| `DECISION_LOG` | TASK_FILE の `Decision Log` に追記 |
+
+### 6-3. **[MUST]** Linear にコメント投稿 + ステータス変更
+
+```
+1. mcp__linear-server__save_comment で LINEAR_ID に LINEAR_COMMENT を投稿
+2. mcp__linear-server__list_issue_statuses で LINEAR_STATUS（通常は "In Review"）の ID を特定
+3. mcp__linear-server__save_issue でステータスを更新
 ```
 
 ---
@@ -236,6 +332,8 @@ orchestrator は以下を変数として保持し、全 command に渡す。
 | `tier` | STEP 0 |
 | `LINEAR_ID` | STEP 1 |
 | `TASK_FILE` | STEP 2 |
+| `PLAN` | STEP 3（startproject の返却） |
+| `BRANCH` | STEP 4（team-implement の返却） |
 
 ---
 
