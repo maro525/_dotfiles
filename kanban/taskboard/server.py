@@ -85,6 +85,11 @@ class BoardState:
         with self._condition:
             return self._version
 
+    @property
+    def board(self) -> Board:
+        with self._condition:
+            return self._board
+
     def snapshot(self) -> tuple[int, bytes]:
         with self._condition:
             return self._version, self._payload
@@ -247,6 +252,7 @@ class BoardServer(ThreadingHTTPServer):
 
     def __init__(self, address: tuple[str, int], state: BoardState, verbose: bool) -> None:
         self.verbose = verbose
+        self.state = state
         handler = type("BoundHandler", (BoardRequestHandler,), {"state": state})
         super().__init__(address, handler)
 
@@ -277,7 +283,7 @@ def run(
 ) -> None:
     """Run the board server until interrupted."""
     server = serve(roots, host, port, recursive, poll_seconds, verbose)
-    board = server.RequestHandlerClass.state._board  # type: ignore[attr-defined]
+    board = server.state.board
     print(f"taskboard  http://{host}:{server.server_address[1]}")
     print(f"  folders : {len(board.roots)}")
     print(f"  tasks   : {len(board.cards)}  (first scan {board.scan_ms:.0f} ms)")
