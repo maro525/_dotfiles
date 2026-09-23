@@ -80,6 +80,9 @@ def _is_meaningful(body: str) -> bool:
     cleaned = _HTML_COMMENT.sub("", body).strip()
     if len(cleaned) < _MIN_MEANINGFUL_CHARS:
         return False
+    # A placeholder is just as much a placeholder when written as a list item:
+    # `- N/A` and `- 未着手。` must not count as content.
+    cleaned = re.sub(r"\A[-*]\s+", "", cleaned)
     return not _PLACEHOLDER.match(cleaned.translate(_WRAPPERS).strip())
 
 
@@ -232,7 +235,7 @@ def parse_file(path: str, mtime: float, size: int) -> ParsedTask:
     aborting the scan.
     """
     try:
-        with open(path, encoding="utf-8", errors="replace") as handle:
+        with open(path, encoding="utf-8-sig", errors="replace") as handle:
             text = handle.read()
     except OSError as exc:
         return ParsedTask(

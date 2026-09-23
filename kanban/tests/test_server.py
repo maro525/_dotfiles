@@ -180,3 +180,105 @@ def test_sse_emits_an_event_when_a_file_changes(decisions: Path) -> None:
     # First line is the on-connect replay; the second is the real change.
     assert len(received) == 2, received
     assert received[1] == "data: 1"
+
+
+def test_head_on_events_sends_no_body_and_does_not_stream(server: str) -> None:
+    """HEAD must not enter the SSE loop: it desyncs the connection and parks a thread."""
+    request = urllib.request.Request(f"{server}/events", method="HEAD")
+    with urllib.request.urlopen(request, timeout=5) as response:
+        assert response.status == 200
+        assert response.read() == b""
+
+
+def test_head_on_events_does_not_leak_threads(server: str) -> None:
+    before = threading.active_count()
+    for _ in range(6):
+        request = urllib.request.Request(f"{server}/events", method="HEAD")
+        with urllib.request.urlopen(request, timeout=5) as response:
+            response.read()
+    time.sleep(0.5)
+    assert threading.active_count() <= before + 2, "HEAD /events parked handler threads"
+
+
+def test_head_on_board_sends_headers_but_no_body(server: str) -> None:
+    request = urllib.request.Request(f"{server}/api/board", method="HEAD")
+    with urllib.request.urlopen(request, timeout=5) as response:
+        assert response.status == 200
+        assert response.headers["ETag"]
+        assert response.read() == b""
+
+
+def test_foreign_host_header_is_rejected(server: str) -> None:
+    """Guards against DNS rebinding: the board is unauthenticated."""
+    with pytest.raises(urllib.error.HTTPError) as excinfo:
+        get(f"{server}/api/board", {"Host": "evil.example.com"})
+    assert excinfo.value.code == 403
+
+
+def test_localhost_host_header_is_accepted(decisions: Path) -> None:
+    srv = serve(roots=(str(decisions),), port=0)
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
+    port = srv.server_address[1]
+    try:
+        response = get(f"http://127.0.0.1:{port}/api/board", {"Host": f"localhost:{port}"})
+        assert response.status == 200
+    finally:
+        srv.shutdown()
+        srv.server_close()
+
+
+class _ScannerStub:
+    """Delegates to a real Scanner but lets a test intercept scan().
+
+    Scanner uses `slots=True`, so its instances cannot be monkeypatched.
+    """
+
+    def __init__(self, inner: Scanner) -> None:
+        self.inner = inner
+        self.on_scan = None
+        self.raise_on_scan: Exception | None = None
+
+    def fingerprint(self):
+        return self.inner.fingerprint()
+
+    def scan(self):
+        if self.raise_on_scan is not None:
+            raise self.raise_on_scan
+        board = self.inner.scan()
+        if self.on_scan is not None:
+            hook, self.on_scan = self.on_scan, None
+            hook()
+        return board
+
+
+def test_initial_fingerprint_precedes_the_first_scan(decisions: Path) -> None:
+    """A file written during the cold scan must still be picked up later.
+
+    Fingerprinting after scanning would record the post-write state for a file
+    the scan never saw, so refresh() would report no change forever.
+    """
+    stub = _ScannerStub(Scanner(roots=(str(decisions),)))
+    extra = decisions / "task-ABC-9-written-mid-scan.md"
+    stub.on_scan = lambda: extra.write_text(TASK.replace("ABC-1", "ABC-9"), encoding="utf-8")
+
+    state = BoardState(stub, poll_seconds=60)  # type: ignore[arg-type]
+    assert len(state.board.cards) == 1, "the mid-scan write should not be in the cold scan"
+    assert state.refresh() is True, "file written during the cold scan was lost"
+    assert len(state.board.cards) == 2
+
+
+def test_failed_scan_does_not_swallow_the_change(decisions: Path) -> None:
+    """If scan() raises, the fingerprint must not advance past the change."""
+    stub = _ScannerStub(Scanner(roots=(str(decisions),)))
+    state = BoardState(stub, poll_seconds=60)  # type: ignore[arg-type]
+
+    target = decisions / "task-ABC-1-first.md"
+    target.write_text(TASK.replace("planning", "done"), encoding="utf-8")
+
+    stub.raise_on_scan = OSError("disk gone")
+    with pytest.raises(OSError):
+        state.refresh()
+
+    stub.raise_on_scan = None
+    assert state.refresh() is True, "the change was lost when the scan failed"
+    assert state.board.cards[0].phase == "done"

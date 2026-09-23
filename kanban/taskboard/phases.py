@@ -62,6 +62,9 @@ _EVIDENCE_RULES: tuple[tuple[Phase, str, str], ...] = (
 #: word boundaries the rules rely on. Separators are turned into spaces instead.
 _NOISE = str.maketrans("", "", "*`")
 
+#: Separates the status claim from trailing commentary about it.
+_COMMENTARY = re.compile(r"[(（\[【,、;；—–]|\s-\s")
+
 
 def normalize_status(status_raw: str | None) -> Phase | None:
     """Map a freeform `status:` value onto a phase, or None if unrecognized.
@@ -79,12 +82,22 @@ def normalize_status(status_raw: str | None) -> Phase | None:
     text = status_raw.translate(_NOISE).strip().lower()
     if not text:
         return None
-    # Underscores are word characters, so `implemented_pending_device_review`
-    # would not match `\breview\b`. Normalize separators to spaces first.
-    text = re.sub(r"[_/]+", " ", text)
-    for pattern, phase in _STATUS_RULES:
-        if pattern.search(text):
-            return phase
+
+    # The leading token is the claim; anything after an opening bracket or dash
+    # is commentary, and the commentary frequently *negates* a later phase --
+    # `implemented（deploy 未実行）`, `in review (PR open, NOT merged)`,
+    # `pr-open (merge / modal deploy pending approval)`. Searching the whole
+    # string would let `deploy` win in all of those. These rules cannot read
+    # negation, so they only get to see the commentary when the head says
+    # nothing recognizable at all.
+    head = _COMMENTARY.split(text, maxsplit=1)[0]
+    for candidate in (head, text):
+        # Underscores are word characters, so `implemented_pending_device_review`
+        # would not match `\breview\b`. Normalize separators to spaces first.
+        normalized = re.sub(r"[_/]+", " ", candidate)
+        for pattern, phase in _STATUS_RULES:
+            if pattern.search(normalized):
+                return phase
     return None
 
 

@@ -136,3 +136,28 @@ def test_unknown_when_no_signal_at_all() -> None:
     card = classify(make_task())
     assert card.phase == "unknown"
     assert card.stale_status is False
+
+
+@pytest.mark.parametrize(
+    ("raw", "expected"),
+    [
+        # Trailing commentary frequently NEGATES a later phase. The leading
+        # token is the claim; the parenthetical is not. All of these occur in
+        # the real corpus and used to classify as `deploy`.
+        ("implemented（deploy 未実行）", "review"),
+        ("in review (PR open, NOT merged)", "review"),
+        ("review passed (deploy 待ち)", "review"),
+        ("in_review (deploy 完了・PR #47 オープン / 自動 merge なし)", "review"),
+        ("pr-open (merge / modal deploy pending approval)", "review"),
+        ("implemented (awaiting review/deploy)", "review"),
+        ("implemented — PR 作成済み / release へのマージと本番デプロイは未実施", "review"),
+        # The head still wins when it is the furthest-along token.
+        ("done (PR #24 In Review)", "done"),
+        ("completed (deployed 2026-07-23)", "done"),
+        # ...and the commentary is still consulted when the head says nothing.
+        ("wip (in review)", "implementing"),
+        ("??? (deployed)", "deploy"),
+    ],
+)
+def test_leading_token_beats_trailing_commentary(raw: str, expected: str) -> None:
+    assert normalize_status(raw) == expected

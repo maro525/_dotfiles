@@ -115,7 +115,10 @@ function cardHtml(card) {
       `<span class="tag stale" title="status: ${escapeHtml(card.statusRaw)} — but the file shows ${escapeHtml(card.evidencePhase)}">stale</span>`
     );
   }
-  if (card.prUrl) {
+  // Escaping alone would still emit a `javascript:` URL verbatim. The server's
+  // PR regex only matches http(s) today, so this is defence in depth against
+  // that regex being widened or another URL field being added later.
+  if (card.prUrl && /^https?:\/\//i.test(card.prUrl)) {
     tags.push(
       `<span class="tag pr"><a href="${escapeHtml(card.prUrl)}" target="_blank" rel="noreferrer">PR</a></span>`
     );

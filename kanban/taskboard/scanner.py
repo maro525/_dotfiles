@@ -25,7 +25,8 @@ from __future__ import annotations
 
 import os
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from typing import ClassVar
 
 from .model import Board, Card
 from .parser import parse_file
@@ -118,19 +119,16 @@ def list_task_files(folder: str) -> list[tuple[str, _CacheKey]]:
 class Scanner:
     """Scans a set of folders, reparsing only the files that changed."""
 
+    #: How long a discovered folder list stays valid, in seconds. Re-walking a
+    #: whole tree on every poll would defeat the point. ClassVar, not a field:
+    #: a bare annotation here would make it a constructor argument and a slot.
+    FOLDER_TTL: ClassVar[float] = 30.0
+
     roots: tuple[str, ...]
     recursive: bool = False
-    _cache: dict[str, tuple[_CacheKey, Card]] = None  # type: ignore[assignment]
+    _cache: dict[str, tuple[_CacheKey, Card]] = field(default_factory=dict)
     _folders: tuple[str, ...] = ()
     _folders_resolved_at: float = 0.0
-
-    #: How long a discovered folder list stays valid, in seconds. Re-walking a
-    #: whole tree on every poll would defeat the point.
-    FOLDER_TTL: float = 30.0
-
-    def __post_init__(self) -> None:
-        if self._cache is None:
-            self._cache = {}
 
     def folders(self, now: float | None = None) -> tuple[str, ...]:
         """Resolve roots to concrete task folders, memoized for FOLDER_TTL."""

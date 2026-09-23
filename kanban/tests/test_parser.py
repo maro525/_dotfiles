@@ -238,3 +238,31 @@ def test_title_keeps_a_hyphenated_word_that_is_not_an_id() -> None:
         "/r/.claude/docs/decisions/task-X-1-f.md",
     )
     assert task.title == "auto-reload should not be stripped"
+
+
+@pytest.mark.parametrize("body", ["- N/A", "- TBD", "* 未着手。", "- 未実施", "-   N/A"])
+def test_placeholder_as_a_list_item_still_counts_as_empty(body: str) -> None:
+    task = parse(f"# Task: x\n\n## Meta\n- status: done\n\n## Review\n{body}\n")
+    assert "review" not in task.filled_sections
+
+
+def test_bom_does_not_break_the_title(tmp_path) -> None:
+    """A UTF-8 BOM would otherwise defeat the H1 anchor and pick up a later heading."""
+    from taskboard.parser import parse_file
+
+    target = tmp_path / "task-X-1-bom.md"
+    target.write_text(
+        "# Task: X-1 — real title\n\n## Meta\n- status: done\n\n```bash\n# rm -rf /\n```\n",
+        encoding="utf-8-sig",
+    )
+    stat = target.stat()
+    task = parse_file(str(target), stat.st_mtime, stat.st_size)
+    assert task.title == "real title"
+
+
+def test_unreadable_file_becomes_a_card_with_a_parse_error(tmp_path) -> None:
+    from taskboard.parser import parse_file
+
+    task = parse_file(str(tmp_path / "task-X-1-missing.md"), 1.0, 0)
+    assert task.parse_error is not None
+    assert task.task_id == "task-X-1-missing.md"

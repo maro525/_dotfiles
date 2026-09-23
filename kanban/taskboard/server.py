@@ -23,6 +23,7 @@ established.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import threading
 import time
@@ -58,27 +59,32 @@ class BoardState:
         self._poll_seconds = poll_seconds
         self._condition = threading.Condition()
         self._version = 0
-        self._board: Board = scanner.scan()
-        self._payload: bytes = self._encode(self._board)
-        self._key: bytes = self._content_key(self._board)
-        self._stop = threading.Event()
+        # Fingerprint BEFORE scanning. The cold scan takes ~1.1 s on a large
+        # corpus, and agents write these files continuously; fingerprinting
+        # afterwards would record the post-write state for a file the scan
+        # missed, so refresh() would see no movement and that file would never
+        # be reparsed for the life of the process.
         self._fingerprint = scanner.fingerprint()
+        self._board: Board = scanner.scan()
+        self._payload, self._key = self._render(self._board)
+        self._stop = threading.Event()
 
     @staticmethod
-    def _encode(board: Board) -> bytes:
-        return json.dumps(board.to_json(), ensure_ascii=False).encode("utf-8")
+    def _render(board: Board) -> tuple[bytes, str]:
+        """Serialize a board once, returning (payload, content key).
 
-    @staticmethod
-    def _content_key(board: Board) -> bytes:
-        """The part of the payload that should drive the ETag.
-
-        `scannedAt` and `scanMs` change on every single scan, so comparing the
-        whole payload would bump the version even when the board is identical.
+        The content key drops `scannedAt` and `scanMs`, which change on every
+        scan and would otherwise bump the ETag when the board is identical.
+        Serializing twice cost ~24 ms per refresh on a 1,000-card board.
         """
         document = board.to_json()
-        document.pop("scannedAt", None)
-        document.pop("scanMs", None)
-        return json.dumps(document, ensure_ascii=False, sort_keys=True).encode("utf-8")
+        volatile = {key: document.pop(key, None) for key in ("scannedAt", "scanMs")}
+        content_key = hashlib.blake2b(
+            json.dumps(document, ensure_ascii=False, sort_keys=True).encode("utf-8"),
+            digest_size=16,
+        ).hexdigest()
+        document.update(volatile)
+        return json.dumps(document, ensure_ascii=False).encode("utf-8"), content_key
 
     @property
     def version(self) -> int:
@@ -99,9 +105,12 @@ class BoardState:
         fingerprint = self._scanner.fingerprint()
         if not force and fingerprint == self._fingerprint:
             return False
-        self._fingerprint = fingerprint
         board = self._scanner.scan()
-        key = self._content_key(board)
+        # Only after a successful scan. Advancing the fingerprint first would
+        # lose the change permanently if scan() raised, since the poll loop
+        # swallows the exception and the next sweep would see no movement.
+        self._fingerprint = fingerprint
+        payload, key = self._render(board)
         with self._condition:
             if key == self._key and not force:
                 # The files moved but the board did not: keep the ETag stable
@@ -109,7 +118,7 @@ class BoardState:
                 self._board = board
                 return False
             self._board = board
-            self._payload = self._encode(board)
+            self._payload = payload
             self._key = key
             self._version += 1
             self._condition.notify_all()
@@ -155,7 +164,23 @@ class BoardRequestHandler(BaseHTTPRequestHandler):
 
     # -- routing ---------------------------------------------------------
 
+    def _host_allowed(self) -> bool:
+        """Reject requests whose Host is not loopback.
+
+        The board serves absolute filesystem paths, branch names and task
+        titles with no authentication. CORS stops a cross-origin page from
+        *reading* a response, but DNS rebinding sidesteps that entirely: a
+        hostile page can point its own domain at 127.0.0.1 and then it is
+        same-origin. Pinning Host to loopback closes that.
+        """
+        host = self.headers.get("Host", "")
+        name = host.rsplit(":", 1)[0].strip("[]") if host else ""
+        return name in ("127.0.0.1", "localhost", "::1", "")
+
     def do_GET(self) -> None:  # noqa: N802 - BaseHTTPRequestHandler API
+        if not self._host_allowed():
+            self.send_error(HTTPStatus.FORBIDDEN, "Invalid Host header")
+            return
         path = self.path.split("?", 1)[0]
         if path in ("/", "/index.html"):
             self._serve_static("index.html")
@@ -197,13 +222,23 @@ class BoardRequestHandler(BaseHTTPRequestHandler):
         self._send_bytes(payload, "application/json; charset=utf-8", etag=etag)
 
     def _serve_events(self) -> None:
+        # An unbounded stream carries neither Content-Length nor a chunked
+        # encoding, so the connection cannot be reused afterwards.
+        self.close_connection = True
         self.send_response(HTTPStatus.OK)
         self.send_header("Content-Type", "text/event-stream; charset=utf-8")
         self.send_header("Cache-Control", "no-cache")
-        self.send_header("Connection", "keep-alive")
+        self.send_header("Connection", "close")
         # Disable proxy buffering if anything sits in front of us.
         self.send_header("X-Accel-Buffering", "no")
         self.end_headers()
+
+        if self.command == "HEAD":
+            # A HEAD must not carry a body. Entering the loop would both
+            # desynchronise the connection and park a handler thread until the
+            # next keepalive write fails -- `curl -I` or a prefetcher is enough
+            # to accumulate them, and ThreadingHTTPServer has no thread cap.
+            return
 
         last_seen = -1
         try:
