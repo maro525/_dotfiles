@@ -5,7 +5,7 @@ context: fork
 agent: general-purpose
 model: best
 color: blue
-allowed-tools: Read, Write, Edit, Bash, Grep, Glob, Agent, Skill, AskUserQuestion, SendMessage, TodoWrite, mcp__linear-server__get_issue
+allowed-tools: Read, Write, Edit, Bash, Grep, Glob, Agent, Skill, SendMessage, TodoWrite, mcp__linear-server__get_issue
 ---
 
 # team-implement

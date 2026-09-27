@@ -5,7 +5,7 @@ context: fork
 agent: Plan
 model: best
 color: red
-allowed-tools: Read, Bash, Grep, Glob, AskUserQuestion, TodoWrite, mcp__linear-server__get_issue, mcp__firecrawl__firecrawl_search, mcp__firecrawl__firecrawl_scrape, mcp__firecrawl__firecrawl_map
+allowed-tools: Read, Bash, Grep, Glob, TodoWrite, mcp__linear-server__get_issue, mcp__firecrawl__firecrawl_search, mcp__firecrawl__firecrawl_scrape, mcp__firecrawl__firecrawl_map
 ---
 
 # startproject
@@ -18,6 +18,7 @@ Write / Edit / Agent は使えない。したがって以下は**自分では行
 - TASK_FILE への書き込み
 - Linear へのコメント投稿
 - サブエージェント（Agent ツール）の起動
+- ユーザーへの質問（不明点は `QUESTIONS` で返し、orchestrate が聞く）
 
 成果物は最終レスポンスとして OUTPUT フォーマットで呼び出し元（`/orchestrate`）に返し、
 **書き込みと Linear 投稿は呼び出し元が行う**。
@@ -35,6 +36,7 @@ $ARGUMENTS の形式: "{task description} --tier={S|M|L} --task-file={TASK_FILE}
 | `--tier` | orchestrator が判定済み |
 | `--task-file` | orchestrator が作成済みのタスクファイルパス（Read のみ。書き込みは呼び出し元） |
 | `--linear-id` | orchestrator が確認済みの Linear タスク ID |
+| `--feedback` | Gate 1 でのユーザーの回答・修正指示（やり直し時のみ）。これを前提に計画を作り直す |
 
 ---
 
@@ -42,12 +44,13 @@ $ARGUMENTS の形式: "{task description} --tier={S|M|L} --task-file={TASK_FILE}
 
 1. コードベースを読む（構造・既存パターン・関連コード・テスト構造・git 履歴）
 
-2. 要件ヒアリング
+2. 要件の整理
    - 目的・スコープ・技術要件・成功基準・最終デザイン
+   - 決められない点は推測で埋めず、OUTPUT の `QUESTIONS` に列挙する（`--feedback` で回答済みの点は除く）
 
 3. プロジェクト概要書を作成
    - Current State / Goal / Scope / Constraints / Success Criteria
-   - ヒアリングで決まった要件は、その理由も添えて Scope / Constraints に書く
+   - 決まった要件は、その理由も添えて Scope / Constraints に書く
    - → OUTPUT の `BRIEF` に含める
 
 ---
@@ -95,22 +98,10 @@ OpenCode に設計相談する（Bash から直接実行）。
 2. Linear への計画完了コメント本文を作成する
    - → OUTPUT の `LINEAR_COMMENT` に含める（投稿は呼び出し元）
 
-3. 以下の基準で承認フローを自己判断する
+3. ユーザーの承認が必要かを判断し、OUTPUT の `GATE1` に書く
 
-### 承認フロー判断基準
-
-**自動承認 → 呼び出し元へ即返す:**
-- タスクの解釈が一意に定まっている
-- 実装方針に選択肢がなく自明
-
-**Gate 1 発動 → ユーザー承認を待つ:**
-- タスクの解釈が複数考えられる
-- 実装方針に大きなトレードオフがある（例: 既存コード大幅変更 vs 新規作成）
-- スコープが曖昧で確認が必要
-- tier=L かつリスクが高い
-
-Gate 1 発動時は `AskUserQuestion` で計画を日本語で提示し、**判断が必要な理由と選択肢を明示**して承認を求める。
-承認されたら即呼び出し元へ制御を返す。差し戻しの場合はフィードバックをもとに計画を修正する。
+- `auto`（承認不要）: タスクの解釈が一意で、実装方針に選択肢がなく自明
+- `required`（承認が必要）: 解釈が複数ある / 大きなトレードオフがある（例: 既存コード大幅変更 vs 新規作成）/ スコープが曖昧 / tier=L かつ高リスク。**理由と選択肢**を添える
 
 ---
 
@@ -129,9 +120,12 @@ Gate 1 発動時は `AskUserQuestion` で計画を日本語で提示し、**判�
 1. ...
 2. ...
 
-### LINEAR_COMMENT
-（Linear に投稿する計画完了コメント本文）
+### QUESTIONS
+（ユーザーに確認したい不明点。なければ「なし」）
 
 ### GATE1
-auto-approved | approved | revised
+auto | required: {理由と選択肢}
+
+### LINEAR_COMMENT
+（Linear に投稿する計画完了コメント本文）
 ```

@@ -5,7 +5,7 @@ context: fork
 agent: general-purpose
 model: haiku
 color: orange
-allowed-tools: Read, Write, Edit, Bash, Grep, Glob, AskUserQuestion, TodoWrite, mcp__linear-server__get_issue
+allowed-tools: Read, Write, Edit, Bash, Grep, Glob, TodoWrite, mcp__linear-server__get_issue
 ---
 
 # deploy
@@ -22,7 +22,7 @@ allowed-tools: Read, Write, Edit, Bash, Grep, Glob, AskUserQuestion, TodoWrite, 
 $ARGUMENTS で指示された書き込み系 git 操作（`$HOME/.claude/rules/tool-routing.md` の「Git Operations」の書き込み系）を実行する。
 
 - `$HOME/.claude/rules/tool-routing.md` の「Git Operations」（保護ブランチ・ホスティング CLI）に従う
-- 履歴を書き換える操作（rebase、`reset --hard`、force push）は実行前にユーザーに確認する
+- 履歴を書き換える操作（rebase、`reset --hard`、force push）は、指示に明示されていなければ実行せず、必要な理由を返す（質問はしない）
 - 完了後、実行したコマンドと結果（コミットハッシュ・ブランチ名・PR/MR URL など）を日本語で簡潔に返す
 
 ---

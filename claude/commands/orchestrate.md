@@ -1,7 +1,6 @@
 ---
 name: orchestrate
 description: Project orchestrator — classify tier, create task file, run startproject → team-implement → team-review → deploy in sequence.
-context: fork
 model: opus[1m]
 color: green
 allowed-tools: Read, Write, Edit, Bash, Grep, Glob, Agent, Skill, AskUserQuestion, TodoWrite, mcp__linear-server__get_issue, mcp__linear-server__save_issue, mcp__linear-server__save_comment, mcp__linear-server__list_issue_statuses
@@ -31,12 +30,14 @@ $ARGUMENTS の形式: "{task description}"
 - 追加の指示がない限り STEP 7 まで完走する
 - **[MUST]** の付いたステップは、どの tier でもスキップしない
 - Linear への投稿・ステータス変更に失敗したら、黙って飛ばさずユーザーに報告する
+- orchestrate はメインのセッションで動き、各 command は fork（バックグラウンド）で動く。command を起動したら**完了通知で返却を受け取るまで次の手順に進まない**
+- **ユーザーへの質問は orchestrate だけが行う。** command は質問せず、確認が必要な点は返却に含めてくる
 
-**原則として止まるのは以下の Gate のみ。** ただし各 command が途中でユーザーに確認を求めた場合（startproject の要件ヒアリングなど）は、それに従う。
+**止まるのは以下の Gate と、STEP 1 の Linear ID の確認のみ。**
 
 | Gate | タイミング | 動作 |
 |---|---|---|
-| Gate 1 | startproject の計画提示後 | ユーザー承認を待つ |
+| Gate 1 | startproject の返却後 | 不明点への回答と計画の承認を待つ（自動承認できる場合を除く） |
 | Gate 2 | team-review の FAIL 時 | ユーザーに報告し判断を待つ |
 
 ## Git ルール
@@ -127,14 +128,11 @@ feature は LINEAR_ID のタスク内容から短いスネークケースで命�
 ### 3-1. 実行
 
 ```
-/startproject "{task description} --tier={tier} --task-file={TASK_FILE} --linear-id={LINEAR_ID}"
+/startproject "{task description} --tier={tier} --task-file={TASK_FILE} --linear-id={LINEAR_ID} [--feedback="{Gate 1 での回答・修正指示}"]"
 ```
 
 startproject は `agent: Plan` の**読み取り専用**コマンドで、自分ではファイルを書かず Linear にも投稿しない。
-計画一式を OUTPUT フォーマット（`BRIEF` / `DESIGN` / `PLAN` / `LINEAR_COMMENT` / `GATE1`）で返してくる。
-
-startproject 内で質問が発生した場合はユーザーが回答する。
-回答後は startproject が続行し、計画が完成したら返却される。
+計画一式を OUTPUT フォーマット（`BRIEF` / `DESIGN` / `PLAN` / `QUESTIONS` / `GATE1` / `LINEAR_COMMENT`）で返してくる。
 
 ### 3-2. **[MUST]** 返却内容を書き込む
 
@@ -148,14 +146,16 @@ startproject 内で質問が発生した場合はユーザーが回答する。
 
 返却が OUTPUT フォーマットに従っていない場合は、startproject に整形し直させてから書き込む。
 
-### 3-3. **[MUST]** Linear にコメントを投稿する
+### 3-3. Gate 1
 
-`mcp__linear-server__save_comment` で LINEAR_ID に `LINEAR_COMMENT` の本文を投稿する。
+- `QUESTIONS` が「なし」で `GATE1: auto` → 自動承認。3-4 へ進む
+- それ以外 → `AskUserQuestion` で計画の要点・`QUESTIONS`・`GATE1` の理由と選択肢を示し、回答と承認を求める
+  - 承認 → 3-4 へ進む
+  - 回答や修正指示がある → それを `--feedback` に入れて 3-1 からやり直す（3-2 で `## startproject` を上書きする）
 
-### 3-4. Gate 1
+### 3-4. **[MUST]** Linear にコメントを投稿する
 
-startproject が自己判断して発動し、ユーザーの承認（または修正）が済んでから返却してくる（詳細は startproject.md 参照）。
-返却後は `GATE1` の値に関わらず即 STEP 4 へ進む。`GATE1`（`auto-approved` / `approved` / `revised`）は STEP 7 の完了報告に含める。
+承認後に、`mcp__linear-server__save_comment` で LINEAR_ID に `LINEAR_COMMENT` の本文を投稿する。
 
 ---
 
@@ -269,7 +269,7 @@ deploy はコミット・push・PR・MR 作成のみ行い、**TASK_FILE への�
 - Task File: {TASK_FILE}
 
 ### 各フェーズのサマリー
-- startproject: ...（Gate 1: {GATE1}）
+- startproject: ...（Gate 1: 自動承認 / 承認 / 修正後に承認）
 - team-implement: ...
 - team-review: ...
 - deploy: ...
