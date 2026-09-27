@@ -5,7 +5,7 @@ context: fork
 agent: general-purpose
 model: haiku
 color: orange
-allowed-tools: Read, Write, Edit, Bash, Grep, Glob, Skill, AskUserQuestion, TodoWrite, mcp__linear-server__get_issue
+allowed-tools: Read, Write, Edit, Bash, Grep, Glob, AskUserQuestion, TodoWrite, mcp__linear-server__get_issue
 ---
 
 # deploy
@@ -19,7 +19,7 @@ allowed-tools: Read, Write, Edit, Bash, Grep, Glob, Skill, AskUserQuestion, Todo
 
 ## Ad-hoc Git モード
 
-$ARGUMENTS で指示された書き込み系 git 操作（add / commit / push / pull / merge / rebase / cherry-pick / tag 作成 / stash pop・apply / reset / revert / branch 作成・checkout・switch）を実行する。
+$ARGUMENTS で指示された書き込み系 git 操作（`$HOME/.claude/rules/tool-routing.md` の「Git Operations」の書き込み系）を実行する。
 
 - `$HOME/.claude/rules/tool-routing.md` の「Git Operations」（保護ブランチ・ホスティング CLI）に従う
 - 履歴を書き換える操作（rebase、`reset --hard`、force push）は実行前にユーザーに確認する
@@ -29,7 +29,7 @@ $ARGUMENTS で指示された書き込み系 git 操作（add / commit / push / 
 
 ## Deploy Workflow モード
 
-デプロイフェーズを担当。push / PR・MR 作成・デプロイ後検証は自分で行う。
+push と PR / MR 作成を担当する（動作検証は team-review で済んでいるので行わない）。
 
 **TASK_FILE への書き込みと Linear への投稿・ステータス変更は行わない。**
 結果は OUTPUT フォーマットで呼び出し元（`/orchestrate` STEP 6）に返し、
@@ -54,12 +54,13 @@ $ARGUMENTS の形式: "{task description} --tier={S|M|L} --task-file={TASK_FILE}
 
 ## 事前準備
 
-デプロイ開始前に必ず以下を読む。
+開始前に必ず以下を読む。
 
-1. TASK_FILE の `## team-review` — PASS/FAIL 判定・申し送り事項を確認
-2. TASK_FILE の `## team-implement` — 変更ファイル一覧・変更の性質を確認
+1. TASK_FILE の `## team-review` の最新回 — PASS/FAIL 判定・申し送り事項を確認
+2. TASK_FILE の `## Meta` の `branch:` — push する作業ブランチ
+3. TASK_FILE の `## team-implement` — PR 本文に書く変更内容（複数回ある場合は全回）
 
-Review が FAIL の場合はデプロイを中止し、ユーザーに報告して終了する。
+Review が FAIL の場合は PR を作らずに中止し、ユーザーに報告して終了する。
 
 ---
 
@@ -77,7 +78,7 @@ Review が FAIL の場合はデプロイを中止し、ユーザーに報告し�
 
 ## STEP 2: PUSH
 
-feature ブランチを `origin` に push する。
+`branch:` のブランチを `origin` に push する。
 
 ---
 
@@ -93,55 +94,31 @@ PR/MR 本文に含める内容:
 
 ---
 
-## STEP 4: デプロイ後検証
-
-TASK_FILE の `## team-implement` で変更の性質を確認し、該当する検証を実行する。
-
-### ブラウザ表示系の変更が含まれる場合
-ブラウザで主要ページ・インタラクションを確認し、スクリーンショットを記録する。使うツールは問わない。
-
-### ロジック系の変更が含まれる場合
-プロジェクトの CLAUDE.md に記載のスモークテストを実行する。
-
----
-
-## STEP 5: RETURN TO ORIGINAL BRANCH
+## STEP 4: RETURN TO ORIGINAL BRANCH
 
 作業開始前のブランチに戻る。不明な場合はリポジトリのデフォルトブランチ。
 
 ---
 
-## STEP 6: OUTPUT を返す
+## STEP 5: OUTPUT を返す
 
 以下のフォーマットを最終レスポンスとしてそのまま返す。
 
 ```markdown
 ### DEPLOY
 
-#### デプロイ結果: SUCCESS
-
-#### 実行内容
-- デプロイ日時: {timestamp}
-- feature ブランチ: feature/{feature-name}
+#### PR / MR
+- 作成日時: {timestamp}
+- ブランチ: {branch} → {base}
 - PR/MR: {PR/MR URL}
-
-#### デプロイ後検証結果
-
-##### ブラウザ確認（該当する場合）
-- 確認した URL・ページ
-- 問題点（あれば）
-
-##### スモークテスト（該当する場合）
-- 実行コマンド
-- 結果
 
 #### 申し送り事項
 - 次タスクへの注意点
 - team-review の minor 指摘（対応推奨）
 
 ### LINEAR_COMMENT
-（Linear に投稿するデプロイ完了コメント本文。以下を含める）
-- feature ブランチ URL
+（Linear に投稿する PR 作成完了コメント本文。以下を含める）
+- ブランチ URL
 - コミット履歴（`git log --oneline` の出力）
 - team-review の結果サマリー
 - PR/MR リンク

@@ -38,7 +38,7 @@ $ARGUMENTS の形式: "{task description} --tier={S|M|L} --task-file={TASK_FILE}
 
 1. TASK_FILE の `## startproject` > `### Brief` — スコープ・成功基準
 2. TASK_FILE の `## startproject` > `### Design` — 設計方針・意図
-3. TASK_FILE の `## team-implement` — 実装サマリー・申し送り事項
+3. TASK_FILE の `## team-implement` の最新回 — 実装サマリー・申し送り事項（差し戻し後は前回の `## team-review` の指摘が直っているかも確認する）
 4. 変更ファイル一覧
 
 変更の性質を判定する（複数該当可）:
@@ -69,7 +69,7 @@ tier に応じたレビュアーを同時に起動する。
 
 ### OpenCode Reviewer
 変更内容が長いのでプロンプトはファイルに落として渡す。
-`--agent plan` と `< /dev/null` は必須・`2>/dev/null` は付けない・**バックグラウンド実行必須**（詳細は `rules/tool-routing.md` の「OpenCode リサーチの実行」）。
+`--agent plan` と `< /dev/null` は必須・`2>/dev/null` は付けない・**バックグラウンド実行必須**（詳細は `$HOME/.claude/rules/tool-routing.md` の「OpenCode リサーチの実行」）。
 
 ```bash
 opencode run --agent plan -m github-copilot/gpt-5.6-sol "$(cat {prompt_file})" < /dev/null

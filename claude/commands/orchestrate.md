@@ -29,8 +29,9 @@ $ARGUMENTS の形式: "{task description}"
 - 報告・通知はするが、応答を待たずに次の STEP へ進む
 - 質問が必要な場合は質問する。回答を受け取ったら止まらず続行する
 - 追加の指示がない限り STEP 7 まで完走する
+- **[MUST]** の付いたステップは、どの tier でもスキップしない
 
-**止まるのは以下の Gate のみ:**
+**原則として止まるのは以下の Gate のみ。** ただし各 command が途中でユーザーに確認を求めた場合（tier のエスカレーション承認など）は、それに従う。
 
 | Gate | タイミング | 動作 |
 |---|---|---|
@@ -49,7 +50,7 @@ $ARGUMENTS の形式: "{task description}"
 
 判定結果と根拠をユーザーに報告する。上書き指示がない限り即 STEP 1 へ進む。
 
-**tier=XS の場合:** 直接実装を提案してここで終了。
+**tier=XS の場合:** 直接実装を提案してここで終了する（STEP 1 以降は S / M / L のみ）。
 
 ---
 
@@ -93,6 +94,7 @@ feature は LINEAR_ID のタスク内容から短いスネークケースで命�
 - tier: {tier}
 - created: {timestamp}
 - status: planning
+- branch:
 
 ## startproject
 ### Brief
@@ -119,8 +121,6 @@ feature は LINEAR_ID のタスク内容から短いスネークケースで命�
 ---
 
 ## STEP 3: startproject を実行
-
-**tier=S,M,L のみ実行。**
 
 ### 3-1. 実行
 
@@ -163,11 +163,11 @@ startproject が自己判断して発動する（詳細は startproject.md 参�
 
 ## STEP 4: team-implement を実行
 
-**全 tier で実行。完了次第即 STEP 5 へ進む。**
+**完了次第即 STEP 5 へ進む。**
 
-### 4-1. Linear ステータスを "In Progress" に変更
+開始時に TASK_FILE の `status` を `implementing` に、Linear のステータスを "In Progress" に変更する（変更できなかった場合はユーザーに報告する）。
 
-### 4-2. 実行
+### 4-1. 実行
 
 ```
 /team-implement "{task description} --tier={tier} --task-file={TASK_FILE} --linear-id={LINEAR_ID}"
@@ -176,27 +176,25 @@ startproject が自己判断して発動する（詳細は startproject.md 参�
 team-implement はコードと git 操作のみ行い、**TASK_FILE への書き込みと Linear 投稿は行わない**。
 結果を OUTPUT フォーマット（`IMPLEMENTATION_NOTES` / `LINEAR_COMMENT` / `BRANCH`）で返してくる。
 
-### 4-3. **[MUST]** 返却内容を書き込む
+### 4-2. **[MUST]** 返却内容を書き込む
 
 | OUTPUT セクション | 書き込み先 |
 |---|---|
-| `IMPLEMENTATION_NOTES` | TASK_FILE の `## team-implement` |
-| `BRANCH` | 変数として保持し STEP 5 / STEP 6 へ引き渡す |
+| `IMPLEMENTATION_NOTES` | TASK_FILE の `## team-implement` に `### {n}回目` として追記 |
+| `BRANCH` | TASK_FILE の `## Meta` の `branch:` |
 
-### 4-4. **[MUST]** Linear にコメントを投稿する
+### 4-3. **[MUST]** Linear にコメントを投稿する
 
 `mcp__linear-server__save_comment` で LINEAR_ID に `LINEAR_COMMENT` の本文を投稿する。
 投稿できなかった場合はユーザーに報告する（無言でスキップしない）。
 
 ### Gate 2（内部確認）
 
-TASK_FILE の `## team-implement` が 4-3 で埋まっていることを確認してから STEP 5 へ進む。
+TASK_FILE の `## team-implement` が 4-2 で埋まっていることを確認してから STEP 5 へ進む。
 
 ---
 
 ## STEP 5: team-review を実行
-
-**tier=XS はスキップして即 STEP 6 へ。**
 
 ### 5-1. 実行
 
@@ -213,9 +211,9 @@ team-review は **TASK_FILE への書き込みと Linear 投稿を行わない**
 
 | OUTPUT セクション | 書き込み先 |
 |---|---|
-| `REVIEW` | TASK_FILE の `## team-review` |
+| `REVIEW` | TASK_FILE の `## team-review` に `### {n}回目` として追記 |
 
-**FAIL の場合も必ず書き込む**（差し戻し履歴を残すため）。
+**FAIL の場合も必ず書き込む**（差し戻し履歴を残すため）。Gate 3 で STEP 4 に戻ったら、次の実装・レビューは n+1 回目として追記する（上書きしない）。
 
 ### 5-3. **[MUST]** Linear にコメントを投稿する
 
@@ -232,7 +230,7 @@ team-review は **TASK_FILE への書き込みと Linear 投稿を行わない**
 
 ## STEP 6: deploy を実行
 
-**全 tier で実行。完了次第即 STEP 7 へ進む。**
+**完了次第即 STEP 7 へ進む。**
 
 ### 6-1. 実行
 
@@ -240,7 +238,7 @@ team-review は **TASK_FILE への書き込みと Linear 投稿を行わない**
 /deploy "{task description} --tier={tier} --task-file={TASK_FILE} --linear-id={LINEAR_ID}"
 ```
 
-deploy は push / PR・MR 作成 / デプロイ後検証のみ行い、**TASK_FILE への書き込みと Linear 操作は行わない**。
+deploy は push と PR・MR 作成のみ行い、**TASK_FILE への書き込みと Linear 操作は行わない**。
 結果を OUTPUT フォーマット（`DEPLOY` / `LINEAR_COMMENT` / `LINEAR_STATUS`）で返してくる。
 
 ### 6-2. **[MUST]** 返却内容を書き込む
@@ -279,14 +277,15 @@ TASK_FILE の `status` を `done` に更新する。
 
 ## 状態管理
 
-orchestrator は以下を変数として保持し、全 command に渡す。
+orchestrator は以下を変数として保持し、全 command に引数で渡す。
 
 | 変数 | 設定タイミング |
 |---|---|
 | `tier` | STEP 0 |
 | `LINEAR_ID` | STEP 1 |
 | `TASK_FILE` | STEP 2 |
-| `BRANCH` | STEP 4（team-implement の返却） |
+
+作業ブランチは引数ではなく TASK_FILE の `## Meta` の `branch:` で受け渡す（STEP 4 で記入）。
 
 ### TASK_FILE の `status`
 

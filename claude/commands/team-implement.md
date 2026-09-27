@@ -15,7 +15,7 @@ allowed-tools: Read, Write, Edit, Bash, Grep, Glob, Agent, Skill, AskUserQuestio
 **TASK_FILE への書き込みと Linear への投稿は行わない。**
 実装結果は OUTPUT フォーマットで呼び出し元（`/orchestrate` STEP 4）に返し、
 TASK_FILE の更新・Linear コメント投稿・ステータス変更は呼び出し元が行う。
-TASK_FILE は Read のみ（`## startproject` の参照用）。
+TASK_FILE は Read のみ（`## startproject` / `## team-review` の参照用）。
 
 ## Input
 
@@ -38,12 +38,13 @@ $ARGUMENTS の形式: "{task description} --tier={S|M|L} --task-file={TASK_FILE}
 1. TASK_FILE の `## startproject` > `### Brief` — プロジェクト概要・スコープ・成功基準
 2. TASK_FILE の `## startproject` > `### Design` — 設計方針とその理由
 3. TASK_FILE の `## startproject` > `### Plan` — 実装タスクリスト
+4. TASK_FILE の `## team-review`（差し戻し時のみ存在）— 最新回の critical / major 指摘。**これの修正を最優先する**
 
 ---
 
 ## IMPLEMENTATION
 
-feature ブランチで作業し、テストを先に書く（TDD）。tier によって体制を切り替える。
+feature ブランチで作業し（TASK_FILE の `## Meta` に `branch:` があれば、差し戻しなのでそのブランチを使う）、テストを先に書く（TDD）。tier によって体制を切り替える。
 
 | tier | 体制 |
 |---|---|

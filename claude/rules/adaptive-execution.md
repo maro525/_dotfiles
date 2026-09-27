@@ -61,7 +61,7 @@ Any of the following automatically escalates to L:
 
 ### OpenCode Design Consultation
 
-設計相談も外部リサーチと同じ呼び出し形を使う: `opencode run --agent plan -m github-copilot/gpt-5.6-sol`（詳細は `rules/tool-routing.md`）。
+設計相談も外部リサーチと同じ呼び出し形を使う: `opencode run --agent plan -m github-copilot/gpt-5.6-sol`（詳細は `$HOME/.claude/rules/tool-routing.md`）。
 
 | Tier | OpenCode Usage |
 |------|------------|

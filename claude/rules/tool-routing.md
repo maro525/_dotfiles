@@ -14,13 +14,7 @@
 
 ## Adaptive Execution Override
 
-> 参照: `.claude/rules/adaptive-execution.md`
-
-ルーティングルールはタスクサイズに応じて適応される：
-
-- **XS/S タスク**: OpenCode / firecrawl への委託は不要。Claude が直接対応する。
-- **M タスク**: 必要な場合のみ OpenCode サブエージェントで設計相談。外部リサーチ（firecrawl + OpenCode）は未知のライブラリ・外部 API がある場合のみ。
-- **L タスク**: フルルーティング（全ルール適用）。
+tier ごとに外部リサーチ・OpenCode を使うかどうかは `$HOME/.claude/rules/adaptive-execution.md` の「External Research」「OpenCode Design Consultation」に従う。以下のルーティングは、そこで「使う」となった場合の委譲先を定める。
 
 ## Routing Table
 
@@ -119,7 +113,7 @@ Task tool parameters:
     opencode run --agent plan -m github-copilot/gpt-5.6-sol "{research question}" < /dev/null
 
     Keep `--agent plan` and the `< /dev/null`, and do NOT append 2>/dev/null — see
-    "OpenCode リサーチの実行" in rules/tool-routing.md for why.
+    "OpenCode リサーチの実行" in $HOME/.claude/rules/tool-routing.md for why.
     Expect this to take over 10 minutes.
 
     Save full output to: .claude/docs/research/{topic}-opencode.md
