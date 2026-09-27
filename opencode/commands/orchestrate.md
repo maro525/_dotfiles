@@ -20,7 +20,9 @@ $ARGUMENTS の形式: "{task description}"
 **$ARGUMENTS を受け取ったら即 STEP 0 から開始する。**
 
 - 全 STEP を自律的に順番に実行する
-- 止まるのは以下の Gate のみ:
+- **[MUST]** の付いたステップは、どの tier でもスキップしない
+
+**原則として止まるのは以下の Gate のみ。** ただし各フェーズが途中でユーザーに確認を求めた場合（tier のエスカレーション承認など）は、それに従う。
 
 | Gate | タイミング | 動作 |
 |------|-----------|------|
@@ -39,7 +41,7 @@ $ARGUMENTS の形式: "{task description}"
 
 判定結果と根拠をユーザーに日本語で報告。上書き指示がない限り即 STEP 1 へ。
 
-**tier=XS の場合:** 直接実装を提案してここで終了。
+**tier=XS の場合:** 直接実装を提案してここで終了する（STEP 1 以降は S / M / L のみ）。
 
 ---
 
@@ -77,6 +79,7 @@ feature は LINEAR_ID のタスク内容から短いスネークケースで命�
 - tier: {tier}
 - created: {timestamp}
 - status: planning
+- branch:
 
 ## startproject
 ### Brief
@@ -104,7 +107,7 @@ feature は LINEAR_ID のタスク内容から短いスネークケースで命�
 
 ## STEP 3: startproject を実行
 
-**tier=S,M,L のみ実行。** subagent を呼び出して計画フェーズを委譲する:
+subagent を呼び出して計画フェーズを委譲する:
 
 ```
 @startproject "{task description} --tier={tier} --task-file={TASK_FILE} --linear-id={LINEAR_ID}"
@@ -121,25 +124,29 @@ startproject 内で質問が発生した場合はユーザーが回答。回答�
 
 ## STEP 4: team-implement を実行
 
-**全 tier で実行。完了次第即 STEP 5 へ。**
+**完了次第即 STEP 5 へ。**
+
+開始時に TASK_FILE の `status` を `implementing` に、Linear のステータスを "In Progress" に変更する（変更できなかった場合はユーザーに報告する）。
 
 ```
 @team-implement "{task description} --tier={tier} --task-file={TASK_FILE} --linear-id={LINEAR_ID}"
 ```
 
-**Gate 2 (内部):** TASK_FILE の `## team-implement` 記入を確認してから STEP 5。
+team-implement は TASK_FILE の `## team-implement` に `### {n}回目` として追記し、`## Meta` の `branch:` に作業ブランチを記入する。
+
+**Gate 2 (内部):** TASK_FILE の `## team-implement` の最新回と `branch:` の記入を確認してから STEP 5。
 
 ---
 
 ## STEP 5: team-review を実行
-
-**tier=XS はスキップして即 STEP 6 へ。**
 
 ```
 @team-review "{task description} --tier={tier} --task-file={TASK_FILE} --linear-id={LINEAR_ID}"
 ```
 
 tier=S の場合は `--mode=self-review` を付ける。
+
+team-review は TASK_FILE の `## team-review` に `### {n}回目` として追記する（FAIL の場合も必ず書き込む）。Gate 3 で STEP 4 に戻ったら、次の実装・レビューは n+1 回目として追記する（上書きしない）。
 
 **Gate 3:**
 - PASS → 即 STEP 6
@@ -149,7 +156,7 @@ tier=S の場合は `--mode=self-review` を付ける。
 
 ## STEP 6: deploy を実行
 
-**全 tier で実行。完了次第即 STEP 7 へ。**
+**完了次第即 STEP 7 へ。**
 
 ```
 @deploy "{task description} --tier={tier} --task-file={TASK_FILE} --linear-id={LINEAR_ID}"
@@ -179,13 +186,15 @@ tier=S の場合は `--mode=self-review` を付ける。
 
 ## 状態管理
 
-以下を変数として保持し、全フェーズに渡す:
+以下を変数として保持し、全フェーズに引数で渡す:
 
 | 変数 | 設定タイミング |
 |------|---------------|
 | `tier` | STEP 0 |
 | `LINEAR_ID` | STEP 1 |
 | `TASK_FILE` | STEP 2 |
+
+作業ブランチは引数ではなく TASK_FILE の `## Meta` の `branch:` で受け渡す（STEP 4 で team-implement が記入）。
 
 ### TASK_FILE の `status`
 

@@ -1,5 +1,5 @@
 ---
-description: Deploy subagent — push feature branch, create PR/MR via gh (GitHub) or glab (GitLab) CLI, update Linear. Without --task-file, runs a single ad-hoc git write operation (commit / push / branch / merge etc.).
+description: Deploy subagent — push the work branch, create PR/MR via gh (GitHub) or glab (GitLab) CLI, update Linear. Without --task-file, runs a single ad-hoc git write operation (commit / push / branch / merge etc.).
 mode: subagent
 model: github-copilot/gpt-5.6-terra
 variant: low
@@ -18,7 +18,7 @@ permission:
 
 ## Ad-hoc Git モード
 
-$ARGUMENTS で指示された書き込み系 git 操作（add / commit / push / pull / merge / rebase / cherry-pick / tag 作成 / stash pop・apply / reset / revert / branch 作成・checkout・switch）を実行する。
+$ARGUMENTS で指示された書き込み系 git 操作（`AGENTS.md` の「GIT RULES」の書き込み系）を実行する。
 
 - `AGENTS.md` の「GIT RULES」（保護ブランチ・ホスティング CLI）に従う
 - 履歴を書き換える操作（rebase、`reset --hard`、force push）は実行前にユーザーに確認する
@@ -28,7 +28,7 @@ $ARGUMENTS で指示された書き込み系 git 操作（add / commit / push / 
 
 ## Deploy Workflow モード
 
-デプロイフェーズを担当。前提: feature ブランチ作成済み・team-review 完了済み・PASS 判定済み。
+push と PR / MR 作成を担当する（動作検証は team-review で済んでいるので行わない）。前提: team-review 完了済み・PASS 判定済み。
 
 ## Input
 
@@ -40,10 +40,11 @@ $ARGUMENTS: "{task description} --tier={S|M|L} --task-file={TASK_FILE} --linear-
 
 ## 事前準備
 
-1. TASK_FILE の `## team-review` — PASS/FAIL 判定・申し送り事項を確認
-2. TASK_FILE の `## team-implement` — 変更ファイル一覧・変更の性質
+1. TASK_FILE の `## team-review` の最新回 — PASS/FAIL 判定・申し送り事項を確認
+2. TASK_FILE の `## Meta` の `branch:` — push する作業ブランチ
+3. TASK_FILE の `## team-implement` — PR 本文に書く変更内容（複数回ある場合は全回）
 
-Review が FAIL の場合はデプロイを中止し、ユーザーに報告して終了。
+Review が FAIL の場合は PR を作らずに中止し、ユーザーに報告して終了。
 
 ---
 
@@ -61,76 +62,52 @@ Review が FAIL の場合はデプロイを中止し、ユーザーに報告し�
 
 ## STEP 2: PUSH
 
-feature ブランチを `origin` に push する。
+`branch:` のブランチを `origin` に push する。
 
 ---
 
 ## STEP 3: CREATE PR / MR
 
-base は feature ブランチの分岐元ブランチ（不明ならリポジトリのデフォルトブランチ）、タイトルは `feat({scope}): {task description}` 形式。
+base は `branch:` のブランチの分岐元ブランチ（不明ならリポジトリのデフォルトブランチ）、タイトルは `feat({scope}): {task description}` 形式。
 
 PR/MR 本文:
 - 変更の概要
 - TASK_FILE の `## startproject` > `### Brief` から成功基準
-- TASK_FILE の `## team-review` から申し送り事項
+- TASK_FILE の `## team-review` の最新回から申し送り事項
 - 関連 Linear タスク: {LINEAR_ID}
 
 ---
 
-## STEP 4: デプロイ後検証
-
-TASK_FILE の `## team-implement` で変更の性質を確認し、該当する検証を実行。
-
-### ブラウザ表示系
-ブラウザで主要ページ・インタラクションを確認し、スクリーンショットを記録する。使うツールは問わない。
-
-### ロジック系
-プロジェクトの `AGENTS.md` / `CLAUDE.md` に記載のスモークテストを実行する。
-
----
-
-## STEP 5: RETURN TO ORIGINAL BRANCH
+## STEP 4: RETURN TO ORIGINAL BRANCH
 
 作業開始前のブランチに戻る。不明な場合はリポジトリのデフォルトブランチ。
 
 ---
 
-## STEP 6: RECORD & POST
+## STEP 5: RECORD & POST
 
 **[MUST] 以下をこの順番で実行。**
 
-### 6-1. Linear デプロイ完了コメント
+### 5-1. Linear PR 作成完了コメント
 Linear MCP `save_comment` で LINEAR_ID に以下を投稿:
-- feature ブランチ URL
+- ブランチ URL
 - コミット履歴
 - team-review の結果サマリー
 - PR/MR リンク
 
-### 6-2. Linear ステータスを "In Review" に変更
+### 5-2. Linear ステータスを "In Review" に変更
 
-### 6-3. TASK_FILE 更新
+### 5-3. TASK_FILE 更新
 
 TASK_FILE の `## deploy`:
 
 ```markdown
 ## deploy
 
-### デプロイ結果: SUCCESS
-
-### 実行内容
-- デプロイ日時: {timestamp}
-- feature ブランチ: feature/{feature-name}
+### PR / MR
+- 作成日時: {timestamp}
+- ブランチ: {branch} → {base}
 - PR/MR: {PR/MR URL}
-
-### デプロイ後検証結果
-
-#### ブラウザ確認（該当時）
-- 確認した URL・ページ
-- 問題点
-
-#### スモークテスト（該当時）
-- 実行コマンド
-- 結果
 
 ### 申し送り事項
 - 次タスクへの注意点

@@ -26,14 +26,15 @@ $ARGUMENTS: "{task description} --tier={S|M|L} --task-file={TASK_FILE} --linear-
 1. TASK_FILE の `## startproject` > `### Brief` — スコープ・成功基準
 2. TASK_FILE の `## startproject` > `### Design` — 設計方針とその理由
 3. TASK_FILE の `## startproject` > `### Plan` — 実装タスクリスト
+4. TASK_FILE の `## team-review`（差し戻し時のみ存在）— 最新回の critical / major 指摘。**これの修正を最優先する**
 
-**[MUST]** Linear MCP `save_comment` で LINEAR_ID に実装開始コメントを投稿（ステータス → In Progress）。
+**[MUST]** Linear MCP `save_comment` で LINEAR_ID に実装開始コメントを投稿。
 
 ---
 
 ## IMPLEMENTATION
 
-feature ブランチで作業し、テストを先に書く（TDD）。tier によって体制を切り替える。
+feature ブランチで作業し（TASK_FILE の `## Meta` に `branch:` があれば、差し戻しなのでそのブランチを使う）、テストを先に書く（TDD）。tier によって体制を切り替える。
 
 | tier | 体制 |
 |------|------|
@@ -58,23 +59,25 @@ Plan のタスクがすべて完了し、テストがすべて通過したら OU
 
 ## OUTPUT
 
-TASK_FILE の `## team-implement`:
+TASK_FILE の `## team-implement` に `### {n}回目` として追記する（既存の回は上書きしない）。作業ブランチ名を `## Meta` の `branch:` に記入する。
 
 ```markdown
 ## team-implement
 
-### 実装サマリー
+### {n}回目
+
+#### 実装サマリー
 - 実装したモジュール・ファイル一覧
 - 主要な実装判断とその理由
 
-### 変更ファイル
+#### 変更ファイル
 - path/to/file.ts — 変更内容の概要
 
-### テスト
+#### テスト
 - テストファイルの場所
 - カバレッジの概要
 
-### 残課題・注意点
+#### 残課題・注意点
 - レビュアーへの申し送り事項
 ```
 

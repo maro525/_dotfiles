@@ -70,13 +70,11 @@ Researcher と Architect を **並列起動**。
 
 ## PHASE 3: PLAN
 
-1. TASK_FILE の `### Brief` と `### Design` を読み、内容を統合
+1. 実装タスクリストを作成し、**[MUST]** TASK_FILE の `## startproject` > `### Plan` に書き込む（進捗管理に `todowrite` を使ってもよい）
 
-2. 実装タスクリストを作成し、**[MUST]** TASK_FILE の `## startproject` > `### Plan` に書き込む（進捗管理に `todowrite` を使ってもよい）
+2. **[MUST]** Linear MCP の `save_comment` で LINEAR_ID に計画完了コメント投稿
 
-3. **[MUST]** Linear MCP の `save_comment` で LINEAR_ID に計画完了コメント投稿
-
-4. 以下の基準で承認フローを自己判断
+3. 以下の基準で承認フローを自己判断
 
 ### 承認フロー判断基準
 

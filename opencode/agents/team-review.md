@@ -23,10 +23,10 @@ $ARGUMENTS: "{task description} --tier={S|M|L} --task-file={TASK_FILE} --linear-
 
 1. TASK_FILE の `## startproject` > `### Brief` — スコープ・成功基準
 2. TASK_FILE の `## startproject` > `### Design` — 設計方針・意図
-3. TASK_FILE の `## team-implement` — 実装サマリー・申し送り
+3. TASK_FILE の `## team-implement` の最新回 — 実装サマリー・申し送り（差し戻し後は前回の `## team-review` の指摘が直っているかも確認する）
 4. 変更ファイル一覧
 
-**[MUST]** Linear MCP `save_comment` でレビュー開始コメント投稿（ステータス → In Progress）。
+**[MUST]** Linear MCP `save_comment` でレビュー開始コメント投稿。
 
 変更の性質を判定:
 
@@ -93,43 +93,45 @@ tier に応じたレビュアーを同時に起動する。
 
 ## OUTPUT
 
-TASK_FILE の `## team-review`:
+TASK_FILE の `## team-review` に `### {n}回目` として追記する（FAIL の場合も必ず書き込む。既存の回は上書きしない）。
 
 ```markdown
 ## team-review
 
-### 判定: PASS / FAIL
+### {n}回目
 
-### コードレビュー統合結果
+#### 判定: PASS / FAIL
 
-#### Primary Reviewer
+#### コードレビュー統合結果
+
+##### Primary Reviewer
 - [severity] 指摘内容
 
-#### Second Opinion Reviewer
+##### Second Opinion Reviewer
 - [severity] 指摘内容
 
-#### Security Reviewer
+##### Security Reviewer
 - [severity] 指摘内容（security.md ルール参照）
 
-#### Simplify Reviewer
+##### Simplify Reviewer
 - [severity] 指摘内容
 
-#### 統合サマリー
+##### 統合サマリー
 - 複数レビュアー共通の指摘（severity 引き上げ）
 - 個別の指摘
 
-### 動作検証結果
+#### 動作検証結果
 
-#### ブラウザ表示確認（該当時）
+##### ブラウザ表示確認（該当時）
 - 確認したページ・状態
 - 問題点
 
-#### テスト実行結果（該当時）
+##### テスト実行結果（該当時）
 - 実行コマンド
 - 結果サマリー
 - 失敗したテスト
 
-### 申し送り事項（minor）
+#### 申し送り事項（minor）
 - deploy フェーズへの注意点
 - リファクタ推奨（次タスクで対応）
 ```
