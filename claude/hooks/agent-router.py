@@ -304,10 +304,7 @@ def has_explicit_skill(prompt: str) -> bool:
     return bool(EXPLICIT_SKILL_RE.search(prompt.strip()))
 
 
-def is_lightweight_task(prompt: str, has_skill_trigger: bool = False) -> bool:
-    if has_skill_trigger:
-        return False
-
+def is_lightweight_task(prompt: str) -> bool:
     prompt_lower = prompt.lower()
 
     for patterns in QUESTION_PATTERNS.values():
@@ -413,7 +410,7 @@ def route_prompt(prompt: str) -> dict | None:
 
     # 2. Check for skill intent
     skill, trigger = detect_skill_intent(prompt)
-    if skill and not is_lightweight_task(prompt, has_skill_trigger=True):
+    if skill and not is_lightweight_task(prompt):
         prompt_summary = prompt.strip()[:80]
         if len(prompt.strip()) > 80:
             prompt_summary += "..."

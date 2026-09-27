@@ -7,7 +7,7 @@
 
 `agent-router.py`（UserPromptSubmit hook）が `[Skill Routing]` / `[Agent Routing]` を additionalContext に出す。ソフトな推奨として扱う。
 
-- **従う**: プロンプトの意図と一致し、ユーザーの明示指示と矛盾しないとき。従う旨を一言伝えて Skill ツールで起動する
+- **従う**: プロンプトの意図と一致し、ユーザーの明示指示と矛盾しないとき。従う旨を一言伝えて起動する（`[Skill Routing]` は Skill ツール、`[Agent Routing]` は提案されたサブエージェント / OpenCode）
 - **従わなくてよい**: ユーザーが別のことを明示している／提案スキルに対してタスクが小さすぎる（XS など）／進行中ワークフロー内の追加質問
 - 提案がずれていると思ったら、理由を伝えてユーザーに確認する
 
@@ -16,14 +16,16 @@
 | Operation | Delegate To | Method |
 |-----------|-------------|--------|
 | External research | **firecrawl MCP + OpenCode** | 二系統を並列実行し Claude が統合（下記） |
-| PDF / 記事 (URL) | **firecrawl MCP** | `firecrawl_parse` / `firecrawl_scrape` |
+| 記事 (URL 1 本) | **WebFetch** | 読めないページは firecrawl（`firecrawl_scrape`） |
+| PDF (URL) / 複数ページ | **firecrawl MCP** | `firecrawl_parse` / `firecrawl_scrape` |
 | 音声・動画 | **未対応** | 委託先なし。ユーザーに扱い方を確認する |
 | Library research | **firecrawl MCP + OpenCode** | `firecrawl_search` で一次情報 + OpenCode で実装知見 |
 | Design decisions | **OpenCode** | Subagent（`opencode run --agent plan -m github-copilot/gpt-5.6-sol`） |
 | git（書き込み系） | **`/deploy` skill** | Ad-hoc Git モード。読み取り系は Claude が直接 |
 | docker/ruff/uv (in `context: fork` skills) | **Direct** | スキル内で直接実行 |
 | docker/ruff/uv (ad-hoc) | **Subagent** | サブエージェント内で実行 |
-| GitHub MCP / Linear MCP | **Direct or Subagent** | スキル内は直接、アドホックはサブエージェント |
+| Linear MCP | **Direct or Subagent** | スキル内は直接、アドホックはサブエージェント |
+| GitHub 操作 | **`gh` CLI** | GitHub MCP は不安定なため使わない |
 
 ## External Research via firecrawl MCP + OpenCode
 
@@ -41,7 +43,7 @@
 **これが唯一動く呼び出し形。他のファイルはこの節を参照する。**
 
 ```bash
-opencode run --agent plan -m github-copilot/gpt-5.6-sol "{research question}" < /dev/null
+timeout 20m opencode run --agent plan -m github-copilot/gpt-5.6-sol "{research question}" < /dev/null
 ```
 
 | 要素 | 外すと壊れる理由 |
@@ -51,11 +53,12 @@ opencode run --agent plan -m github-copilot/gpt-5.6-sol "{research question}" < 
 | `2>/dev/null` を**付けない** | エラーを stderr に出しつつ **exit code 0** で終わる。潰すと「成功したのに出力が空」に見える |
 | モデルは `github-copilot/gpt-5.6-sol` | `openai/gpt-5.6-sol` は残高切れ（`insufficient_quota`）で**必ず失敗する**。課金が復活したら第一候補に戻す |
 | **バックグラウンド実行必須** | 込み入った質問は 10 分超。Bash ツールの既定 10 分で kill されると出力ゼロになり、ハングと見分けがつかない |
+| `timeout 20m` **必須** | 失敗後にプロセスが終わらないことがある（429 の後に MCP の認証待ちで止まり、完了通知が来ないまま待ち続けた）。exit code 124 で終わったら「OpenCode 不可: タイムアウト」として扱う |
 | cwd は **git リポジトリ** | 非 git ディレクトリ（`/tmp` 等）だと起動時の `service=vcs` 初期化で無言ハングする |
 
 - **完了はバックグラウンドタスクの完了通知で待つ。** `pgrep` / `tail --pid` で自前監視しない（`pgrep -f` は監視コマンド自身にマッチし、タイムアウトまで待ち続ける）
 - **モデルは上記で固定。** 失敗しても差し替えない
-- **呼べないときは諦めて先に進む。** quota / 429 / 認証エラーなどで失敗したら、再試行もモデル変更もせず OpenCode なしで続け、成果物（Design・レビュー結果など）に「OpenCode 不可: {理由}」と書く
+- **呼べないときは諦めて先に進む。** quota / 429 / 認証エラー / タイムアウトなどで失敗したら、再試行もモデル変更もせず OpenCode なしで続け、成果物（Design・レビュー結果など）に「OpenCode 不可: {理由}」と書く
 - 長文プロンプトはファイルに落として `"$(cat prompt.txt)"` で渡す
 - ツール呼び出しで止まらせたくなければ、プロンプト冒頭に `DO NOT USE ANY TOOLS`
 - 空出力を quota と決めつけず、ログ（`~/.local/share/opencode/log/`、1 セッション 1 ファイル）で確認する。正常なら `service=session` → `POST /session` → `service=snapshot` → `resolveTools` → `service=llm … stream` と進む。**`service=vcs … initialized` で止まっていれば stdin 詰まり**（`< /dev/null` 忘れ）で、非 git cwd と同じ見た目になる
@@ -91,7 +94,7 @@ Return CONCISE summary.
 
 # 系統 2: 実装知見
 Run OpenCode research on: {topic}
-opencode run --agent plan -m github-copilot/gpt-5.6-sol "{research question}" < /dev/null
+timeout 20m opencode run --agent plan -m github-copilot/gpt-5.6-sol "{research question}" < /dev/null
 Keep `--agent plan` and `< /dev/null`, do NOT append 2>/dev/null — see
 "OpenCode リサーチの実行" in $HOME/.claude/rules/tool-routing.md. Expect over 10 minutes.
 Save full output to: .claude/docs/research/{topic}-opencode.md
@@ -135,14 +138,14 @@ so it can be checked against the firecrawl sources.
 
 `origin` のリモート URL で判定し、GitLab（セルフホスト含む）は `glab`、GitHub は `gh` を使う。GitHub MCP は不安定なため使わない。
 
-## GitHub / Linear MCP Operations
+## Linear MCP Operations
 
 スキル外での MCP 操作はサブエージェント（Agent ツール、`general-purpose`）経由で実行する。
 
 ```
 Perform the following MCP operation.
 Task: {description}
-Use Linear/GitHub MCP tools directly.
+Use Linear MCP tools directly.
 Report results back concisely in Japanese.
 ```
 
