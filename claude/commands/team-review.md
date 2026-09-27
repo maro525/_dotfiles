@@ -68,7 +68,7 @@ tier に応じたレビュアーを同時に起動する。**レビュー中は�
 
 ### OpenCode Reviewer
 変更内容が長いのでプロンプトはファイルに落として渡す。
-`--agent plan` と `< /dev/null` は必須・`2>/dev/null` は付けない・**バックグラウンド実行必須**（詳細は `$HOME/.claude/rules/tool-routing.md` の「OpenCode リサーチの実行」）。
+呼び出し方・待ち方・失敗時の扱いは `$HOME/.claude/rules/tool-routing.md` の「OpenCode リサーチの実行」に従う。呼べなければこのレビュアーは飛ばし、結果に「OpenCode 不可: {理由}」と書く。
 
 ```bash
 opencode run --agent plan -m github-copilot/gpt-5.6-sol "$(cat {prompt_file})" < /dev/null
