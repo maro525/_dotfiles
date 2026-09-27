@@ -1,11 +1,11 @@
 ---
 name: team-review
-description: Review phase — 4 parallel reviewers (Claude / OpenCode / Security / Simplify), browser check or test execution; returns a review payload. The caller writes TASK_FILE and posts to Linear. Called by /orchestrate with tier, task-file, linear-id.
+description: Review phase — parallel reviewers by tier (S: Claude / M: +OpenCode, Security / L: +Simplify), browser check or test execution; returns a review payload. The caller writes TASK_FILE and posts to Linear. Called by /orchestrate with tier, task-file, linear-id.
 context: fork
 agent: general-purpose
 model: opus
 color: yellow
-allowed-tools: Read, Write, Edit, Bash, Grep, Glob, Agent, Skill, AskUserQuestion, TodoWrite, mcp__linear-server__get_issue, mcp__agent-browser__navigate, mcp__agent-browser__screenshot, mcp__agent-browser__click, mcp__agent-browser__type
+allowed-tools: Read, Write, Edit, Bash, Grep, Glob, Agent, Skill, AskUserQuestion, TodoWrite, mcp__linear-server__get_issue
 ---
 
 # team-review
@@ -15,9 +15,7 @@ allowed-tools: Read, Write, Edit, Bash, Grep, Glob, Agent, Skill, AskUserQuestio
 **TASK_FILE への書き込みと Linear への投稿は行わない。**
 レビュー結果は OUTPUT フォーマットで呼び出し元（`/orchestrate` STEP 5）に返し、
 TASK_FILE の更新・Linear コメント投稿は呼び出し元が行う。
-TASK_FILE は Read のみ（`Brief` / `Design` / `Implementation Notes` の参照用）。
-
-Don't-Ask 等の共通ルールは CLAUDE.md 参照。
+TASK_FILE は Read のみ（`## startproject` / `## team-implement` の参照用）。
 
 ## Input
 
@@ -38,39 +36,43 @@ $ARGUMENTS の形式: "{task description} --tier={S|M|L} --task-file={TASK_FILE}
 
 レビュー開始前に必ず以下を読む。
 
-1. TASK_FILE の `Brief` セクション — スコープ・成功基準
-2. TASK_FILE の `Design` セクション — 設計方針・意図
-3. TASK_FILE の `Implementation Notes` セクション — 実装サマリー・申し送り事項
-4. `.claude/rules/security.md` — セキュリティチェックルール（Security Reviewer が使用）
-5. 変更ファイル一覧を Read で確認
+1. TASK_FILE の `## startproject` > `### Brief` — スコープ・成功基準
+2. TASK_FILE の `## startproject` > `### Design` — 設計方針・意図
+3. TASK_FILE の `## team-implement` — 実装サマリー・申し送り事項
+4. 変更ファイル一覧
 
 変更の性質を判定する（複数該当可）:
 
 | 性質 | 判定基準 | 検証方法 |
 |---|---|---|
-| ブラウザ表示系 | UI コンポーネント・CSS・レイアウト変更を含む | agent-browser で表示確認 |
+| ブラウザ表示系 | UI コンポーネント・CSS・レイアウト変更を含む | ブラウザで表示確認 |
 | ロジック系 | ビジネスロジック・API・データ処理を含む | テスト実行 |
 
 ---
 
-## STEP 1: コードレビュー（4並列）
+## STEP 1: コードレビュー（並列）
 
-**以下の4レビュアーを同時に起動し、結果を Claude Lead に報告する。**
-**mode=self-review の場合は Claude Reviewer のみ実行。**
+tier に応じたレビュアーを同時に起動する。
 
-### Claude Reviewer
-変更ファイルを直接 Read してレビュー。
+| tier | レビュアー |
+|---|---|
+| S（`--mode=self-review`） | Claude |
+| M | Claude / OpenCode / Security |
+| L | Claude / OpenCode / Security / Simplify |
 
-観点:
-- **Quality** — 可読性・命名・重複・SOLID原則
-- **Logic** — バグ・エッジケース・エラーハンドリング
+| レビュアー | 方法 |
+|---|---|
+| Claude | 変更ファイルを直接読み、Quality / Logic の観点でレビュー |
+| OpenCode | 下記。観点は Claude と同じ（別モデルによるセカンドオピニオン） |
+| Security | `$HOME/.claude/rules/security.md` のルールを変更コードに照合し、違反・懸念を severity 付きで列挙 |
+| Simplify | `/simplify` スキルを変更ファイルに対して実行 |
 
 ### OpenCode Reviewer
 変更内容が長いのでプロンプトはファイルに落として渡す。
-`--agent plan` は必須・`2>/dev/null` は付けない・**バックグラウンド実行必須**（詳細は `rules/tool-routing.md` の「OpenCode リサーチの実行」）。
+`--agent plan` と `< /dev/null` は必須・`2>/dev/null` は付けない・**バックグラウンド実行必須**（詳細は `rules/tool-routing.md` の「OpenCode リサーチの実行」）。
 
 ```bash
-opencode run --agent plan -m github-copilot/gpt-5.6-sol "$(cat {prompt_file})"
+opencode run --agent plan -m github-copilot/gpt-5.6-sol "$(cat {prompt_file})" < /dev/null
 ```
 
 プロンプトの中身:
@@ -81,45 +83,11 @@ DO NOT USE ANY TOOLS.
 {変更ファイルの内容}
 ```
 
-観点:
-- **Quality** — 可読性・命名・重複・SOLID原則
-- **Logic** — バグ・エッジケース・エラーハンドリング
-
-### Security Reviewer
-`.claude/rules/security.md` を Read し、記載されたルールに従って変更ファイルをチェックする。
-
-```
-1. Read .claude/rules/security.md
-2. ルールの各項目を変更コードに照合
-3. 違反・懸念箇所を severity 付きで列挙
-```
-
-観点（security.md の内容に従う）:
-- 認証・認可の抜け
-- 入力バリデーション・サニタイズ
-- 機密情報のハードコード
-- SQL インジェクション・XSS などの脆弱性
-- その他 security.md に記載されたルール
-
-### Simplify Reviewer
-`/simplify` スキルを実行して複雑さを検出する。
-
-```
-Skill: simplify
-対象: 変更ファイル一覧
-```
-
-観点:
-- 過剰な複雑さ・不要な抽象化
-- デッドコード・未使用変数
-- 簡略化できるロジック
-- リファクタリング提案
-
 ---
 
-## STEP 2: Claude Lead による統合
+## STEP 2: 統合
 
-4レビュアーの結果を受け取り統合する。
+各レビュアーの結果を受け取り統合する。
 
 - 重複する指摘は1件にまとめ、severity を引き上げる
 - 矛盾する指摘はより厳しい方を採用
@@ -131,33 +99,13 @@ Skill: simplify
 
 変更の性質に応じて実行する。両方該当する場合は両方実施。
 
-### ブラウザ表示系 → agent-browser で確認
+### ブラウザ表示系 → ブラウザで確認
 
-```
-1. mcp__agent-browser__navigate で対象ページを開く
-2. mcp__agent-browser__screenshot でスクリーンショットを取得
-3. 表示崩れ・レイアウト問題を目視確認
-4. インタラクションが必要な場合は click / type で操作
-5. 各状態のスクリーンショットを取得して記録
-```
-
-確認観点:
-- デザイン仕様との一致
-- レスポンシブ対応（必要な場合）
-- インタラクション動作（ホバー・クリック・フォーム送信など）
-- エラー状態・空状態の表示
+対象ページを開いて操作し、各状態のスクリーンショットを記録する。使うツールは問わない。
 
 ### ロジック系 → テスト実行
 
-```bash
-# プロジェクトのテストコマンドを CLAUDE.md または package.json から確認して実行
-{test_command}
-```
-
-確認観点:
-- 全テストが通過しているか
-- 新規実装に対応するテストが存在するか
-- カバレッジに明らかな欠落がないか
+プロジェクトのテストを実行し、新規実装に対応するテストがあるかも確認する。
 
 ---
 
@@ -178,9 +126,7 @@ Skill: simplify
 
 ## OUTPUT
 
-**TASK_FILE には書き込まない。Linear にも投稿しない。**
 以下のフォーマットを最終レスポンスとしてそのまま返す。
-呼び出し元（`/orchestrate` STEP 5-2 / 5-3）が TASK_FILE と Linear へ反映する。
 
 ```markdown
 ### VERDICT
@@ -221,26 +167,6 @@ PASS | FAIL
 - deploy フェーズへの注意点
 - リファクタリング推奨（次タスクで対応）
 
-### DECISION_LOG
-- [team-review] POST: ...
-
 ### LINEAR_COMMENT
 （Linear に投稿するレビュー結果コメント本文。PASS/FAIL + サマリー）
 ```
-
-| OUTPUT セクション | 呼び出し元での反映先 |
-|---|---|
-| `VERDICT` | Gate 3 の判定に使用 |
-| `REVIEW` | TASK_FILE の `Review` セクション（見出しレベルはそのまま貼れる） |
-| `DECISION_LOG` | TASK_FILE の `Decision Log` に追記 |
-| `LINEAR_COMMENT` | Linear に投稿 |
-
----
-
-## DONT-ASK MODE
-
-| 通常の確認 | DONT-ASK 時の動作 |
-|---|---|
-| ブラウザ確認の要否判断 | 変更ファイルに UI 関連が含まれれば自動実行 |
-| テスト実行の要否判断 | ロジック変更が含まれれば自動実行 |
-| PASS/FAIL 報告 | 判定結果を呼び出し元へそのまま返す |

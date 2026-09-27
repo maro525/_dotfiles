@@ -37,30 +37,15 @@ $ARGUMENTS の形式: "{task description}"
 | Gate 1 | startproject の計画提示後 | ユーザー承認を待つ |
 | Gate 3 | team-review の FAIL 時 | ユーザーに報告し判断を待つ |
 
-## Git 共通ルール（全 STEP）
+## Git ルール
 
-- ホスティングに応じて CLI を使い分ける: GitLab → `glab` / GitHub → `gh`（`git remote get-url origin` で判定）
-- **保護ブランチ `release` / `staging` / `main`（master 含む）への直接コミット・push は、ユーザーの明示的な許可がない限り禁止**。反映は必ず PR / MR 経由
-- 保護ブランチ上で作業を始める場合は feature ブランチを作成してから実装する（tier=XS も同様）
+`$HOME/.claude/rules/tool-routing.md` の「Git Operations」に従う。
 
 ---
 
 ## STEP 0: CLASSIFY
 
-Read `$HOME/.claude/rules/adaptive-execution.md` を読んで tier を判定する。
-
-```
-tier = max(file_tier, complexity_tier, risk_tier)
-```
-
-Hard Triggers（認証・DB migration・支払い・公開API変更・新規コア依存追加）は自動で L。
-
-| tier | 判定基準 |
-|---|---|
-| XS | 1ファイル・ロジック変更なし・リスクなし |
-| S | 1-3ファイル・単一パターン・低リスク |
-| M | 4-10ファイル・複数パターン・中リスク |
-| L | 10+ファイル・アーキテクチャ変更・高リスク |
+`$HOME/.claude/rules/adaptive-execution.md` の基準で tier を判定する。
 
 判定結果と根拠をユーザーに報告する。上書き指示がない限り即 STEP 1 へ進む。
 
@@ -70,12 +55,7 @@ Hard Triggers（認証・DB migration・支払い・公開API変更・新規コ�
 
 ## STEP 1: LINEAR タスク確認
 
-まず $ARGUMENTS から Linear ID パターンを検出する。
-
-```
-パターン例: PROJ-573、ABC-123
-正規表現: [A-Z]+-[0-9]+
-```
+$ARGUMENTS から Linear ID（例: `PROJ-573`）を検出する。
 
 **ID が検出できた場合:**
 - LINEAR_ID として使用。確認不要
@@ -114,24 +94,27 @@ feature は LINEAR_ID のタスク内容から短いスネークケースで命�
 - created: {timestamp}
 - status: planning
 
-## Brief
+## startproject
+### Brief
 <!-- orchestrator が startproject の返却 BRIEF から記入 -->
 
-## Decision Log
-<!-- 各 command が追記 -->
+### Design
+<!-- orchestrator が startproject の返却 DESIGN から記入 -->
 
-## Design
-<!-- orchestrator が startproject の返却 DESIGN から記入（tier=M,L）。tier=S は空欄でよい -->
+### Plan
+<!-- orchestrator が startproject の返却 PLAN から記入 -->
 
-## Implementation Notes
-<!-- team-implement が記入 -->
+## team-implement
+<!-- orchestrator が team-implement の返却 IMPLEMENTATION_NOTES から記入 -->
 
-## Review
-<!-- team-review が記入 -->
+## team-review
+<!-- orchestrator が team-review の返却 REVIEW から記入 -->
 
-## Deploy
-<!-- deploy が記入 -->
+## deploy
+<!-- orchestrator が deploy の返却 DEPLOY から記入 -->
 ```
+
+`##` 見出しはプロセス名で固定する（kanban がこの見出しでフェーズを判定する）。
 
 ---
 
@@ -146,7 +129,7 @@ feature は LINEAR_ID のタスク内容から短いスネークケースで命�
 ```
 
 startproject は `agent: Plan` の**読み取り専用**コマンドで、自分ではファイルを書かず Linear にも投稿しない。
-計画一式を OUTPUT フォーマット（`BRIEF` / `DECISION_LOG` / `DESIGN` / `CLAUDE_MD_CURRENT_PROJECT` / `PLAN` / `LINEAR_COMMENT` / `GATE1`）で返してくる。
+計画一式を OUTPUT フォーマット（`BRIEF` / `DESIGN` / `PLAN` / `LINEAR_COMMENT` / `GATE1`）で返してくる。
 
 startproject 内で質問が発生した場合はユーザーが回答する。
 回答後は startproject が続行し、計画が完成したら返却される。
@@ -155,13 +138,11 @@ startproject 内で質問が発生した場合はユーザーが回答する。
 
 **orchestrator が実行する。startproject は Write / Edit を持たないため実行できない。**
 
-| OUTPUT セクション | 書き込み先 | tier |
-|---|---|---|
-| `BRIEF` | TASK_FILE の `Brief` セクション | 全 tier |
-| `DECISION_LOG` | TASK_FILE の `Decision Log` に追記 | 全 tier |
-| `DESIGN` | TASK_FILE の `Design` セクション | M, L（S は N/A） |
-| `CLAUDE_MD_CURRENT_PROJECT` | プロジェクトの `CLAUDE.md` に Current Project セクションを追加 | 全 tier |
-| `PLAN` | 変数として保持し STEP 4 へ引き渡す | 全 tier |
+| OUTPUT セクション | 書き込み先 |
+|---|---|
+| `BRIEF` | TASK_FILE の `## startproject` > `### Brief` |
+| `DESIGN` | TASK_FILE の `## startproject` > `### Design` |
+| `PLAN` | TASK_FILE の `## startproject` > `### Plan` |
 
 返却が OUTPUT フォーマットに従っていない場合は、startproject に整形し直させてから書き込む。
 
@@ -186,34 +167,20 @@ startproject が自己判断して発動する（詳細は startproject.md 参�
 
 ### 4-1. Linear ステータスを "In Progress" に変更
 
-```
-1. mcp__linear-server__list_issue_statuses で利用可能なステータス一覧を取得
-2. "In Progress" に該当するステータス ID を特定
-3. mcp__linear-server__save_issue でステータスを更新
-```
-
 ### 4-2. 実行
 
 ```
 /team-implement "{task description} --tier={tier} --task-file={TASK_FILE} --linear-id={LINEAR_ID}"
 ```
 
-| tier | 動作 |
-|---|---|
-| XS | Claude が直接実装。ただし保護ブランチ（release/staging/main）上にいる場合は feature ブランチを作成 |
-| S | feature ブランチ。Claude が直接実装 |
-| M | feature ブランチ。Claude 直接 or 1-2 サブエージェント |
-| L | feature ブランチ。フルチーム（モジュール単位オーナーシップ） |
-
 team-implement はコードと git 操作のみ行い、**TASK_FILE への書き込みと Linear 投稿は行わない**。
-結果を OUTPUT フォーマット（`IMPLEMENTATION_NOTES` / `DECISION_LOG` / `LINEAR_COMMENT` / `BRANCH`）で返してくる。
+結果を OUTPUT フォーマット（`IMPLEMENTATION_NOTES` / `LINEAR_COMMENT` / `BRANCH`）で返してくる。
 
 ### 4-3. **[MUST]** 返却内容を書き込む
 
 | OUTPUT セクション | 書き込み先 |
 |---|---|
-| `IMPLEMENTATION_NOTES` | TASK_FILE の `Implementation Notes` セクション |
-| `DECISION_LOG` | TASK_FILE の `Decision Log` に追記 |
+| `IMPLEMENTATION_NOTES` | TASK_FILE の `## team-implement` |
 | `BRANCH` | 変数として保持し STEP 5 / STEP 6 へ引き渡す |
 
 ### 4-4. **[MUST]** Linear にコメントを投稿する
@@ -223,7 +190,7 @@ team-implement はコードと git 操作のみ行い、**TASK_FILE への書き
 
 ### Gate 2（内部確認）
 
-TASK_FILE の `Implementation Notes` が 4-3 で埋まっていることを確認してから STEP 5 へ進む。
+TASK_FILE の `## team-implement` が 4-3 で埋まっていることを確認してから STEP 5 へ進む。
 
 ---
 
@@ -237,22 +204,16 @@ TASK_FILE の `Implementation Notes` が 4-3 で埋まっていることを確�
 /team-review "{task description} --tier={tier} --task-file={TASK_FILE} --linear-id={LINEAR_ID}"
 ```
 
-| tier | レビュー方式 |
-|---|---|
-| XS | スキップ |
-| S | `--mode=self-review`（Claude 単独レビュー） |
-| M | 2レビュアー（Claude + OpenCode） |
-| L | 4レビュアー（Claude / OpenCode / Security / Simplify） |
+tier=S の場合は `--mode=self-review` を付ける。
 
 team-review は **TASK_FILE への書き込みと Linear 投稿を行わない**。
-結果を OUTPUT フォーマット（`VERDICT` / `REVIEW` / `DECISION_LOG` / `LINEAR_COMMENT`）で返してくる。
+結果を OUTPUT フォーマット（`VERDICT` / `REVIEW` / `LINEAR_COMMENT`）で返してくる。
 
 ### 5-2. **[MUST]** 返却内容を書き込む
 
 | OUTPUT セクション | 書き込み先 |
 |---|---|
-| `REVIEW` | TASK_FILE の `Review` セクション |
-| `DECISION_LOG` | TASK_FILE の `Decision Log` に追記 |
+| `REVIEW` | TASK_FILE の `## team-review` |
 
 **FAIL の場合も必ず書き込む**（差し戻し履歴を残すため）。
 
@@ -267,8 +228,6 @@ team-review は **TASK_FILE への書き込みと Linear 投稿を行わない**
 - `PASS` → 即 STEP 6 へ進む
 - `FAIL` → ユーザーに報告し判断を待つ。team-implement に戻るか確認する
 
-**DONT-ASK MODE:** FAIL 時は自動で STEP 4 に戻り1回リトライする。
-
 ---
 
 ## STEP 6: deploy を実行
@@ -282,22 +241,17 @@ team-review は **TASK_FILE への書き込みと Linear 投稿を行わない**
 ```
 
 deploy は push / PR・MR 作成 / デプロイ後検証のみ行い、**TASK_FILE への書き込みと Linear 操作は行わない**。
-結果を OUTPUT フォーマット（`DEPLOY` / `DECISION_LOG` / `LINEAR_COMMENT` / `LINEAR_STATUS`）で返してくる。
+結果を OUTPUT フォーマット（`DEPLOY` / `LINEAR_COMMENT` / `LINEAR_STATUS`）で返してくる。
 
 ### 6-2. **[MUST]** 返却内容を書き込む
 
 | OUTPUT セクション | 書き込み先 |
 |---|---|
-| `DEPLOY` | TASK_FILE の `Deploy` セクション |
-| `DECISION_LOG` | TASK_FILE の `Decision Log` に追記 |
+| `DEPLOY` | TASK_FILE の `## deploy` |
 
 ### 6-3. **[MUST]** Linear にコメント投稿 + ステータス変更
 
-```
-1. mcp__linear-server__save_comment で LINEAR_ID に LINEAR_COMMENT を投稿
-2. mcp__linear-server__list_issue_statuses で LINEAR_STATUS（通常は "In Review"）の ID を特定
-3. mcp__linear-server__save_issue でステータスを更新
-```
+`LINEAR_COMMENT` を投稿し、ステータスを `LINEAR_STATUS`（通常は "In Review"）に変更する。
 
 ---
 
@@ -332,15 +286,16 @@ orchestrator は以下を変数として保持し、全 command に渡す。
 | `tier` | STEP 0 |
 | `LINEAR_ID` | STEP 1 |
 | `TASK_FILE` | STEP 2 |
-| `PLAN` | STEP 3（startproject の返却） |
 | `BRANCH` | STEP 4（team-implement の返却） |
 
----
+### TASK_FILE の `status`
 
-## DONT-ASK MODE
+各 STEP の開始時に `## Meta` の `status` を更新する（Gate 3 で STEP 4 に戻った場合も `implementing` に戻す）。
 
-| 通常の確認 | DONT-ASK 時の動作 |
+| タイミング | status |
 |---|---|
-| tier 上書き確認 | 判定結果をそのまま使用して続行 |
-| Gate 1 承認 | 自動承認して続行 |
-| Gate 3 FAIL 時の判断 | 自動で team-implement に戻り1回リトライ |
+| STEP 2（作成時） | `planning` |
+| STEP 4 開始 | `implementing` |
+| STEP 5 開始 | `reviewing` |
+| STEP 6 開始 | `deploying` |
+| STEP 7 | `done` |

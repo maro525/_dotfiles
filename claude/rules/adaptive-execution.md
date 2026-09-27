@@ -46,36 +46,7 @@ Any of the following automatically escalates to L:
 
 ## Workflow per Tier
 
-### /startproject
-
-| Tier | Phase 1 (Understand) | Phase 2 (Research & Design) | Phase 3 (Plan) |
-|------|---------------------|---------------------------|----------------|
-| **XS** | Skip /startproject entirely | - | - |
-| **S** | Codebase read + brief | Skip | Simple task list |
-| **M** | Codebase read + brief | OpenCode consultation only (no team) | Task list + design |
-| **L** | Full codebase analysis | firecrawl MCP + OpenCode を並列実行 | Full plan |
-
-> `/startproject` は `agent: Plan`（読み取り専用）で動く。Write / Edit / Agent を持たないため、
-> リサーチは Bash・MCP から直接実行し、teammate は起動しない。
-> 成果物は OUTPUT として `/orchestrate` に返し、TASK_FILE への書き込みと Linear 投稿は `/orchestrate` が行う。
-
-### /team-implement
-
-| Tier | Team Structure | Branch |
-|------|---------------|--------|
-| **XS** | Claude implements directly | No branch needed |
-| **S** | Claude implements directly | Feature branch |
-| **M** | Claude directly or 1-2 teammates | Feature branch |
-| **L** | Full team (module-based ownership) | Feature branch |
-
-### /team-review
-
-| Tier | Review Approach |
-|------|----------------|
-| **XS** | Skip review |
-| **S** | Claude self-review (single pass) |
-| **M** | 2 reviewers (Security + Quality) |
-| **L** | Full 4 reviewers (Security, Quality, Test, Simplify) |
+各フェーズの tier 別の体制は各 command（`startproject` / `team-implement` / `team-review`）に定義する。XS は `/orchestrate` を使わず直接実装する。
 
 ### External Research (firecrawl MCP + OpenCode)
 
