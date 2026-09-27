@@ -14,7 +14,10 @@ sync_common::parse_args "$(basename "$0")" "Sync ~/.claude dotfiles to this repo
 sync_common::show_header "$(basename "$0")"
 
 # Cloudflare plugin skills are vendor content — see SYNC_COMMON_CLOUDFLARE_SKILLS.
-SKILL_EXCLUDES=("${SYNC_COMMON_CLOUDFLARE_SKILLS[@]}")
+# skills/synced/ is managed by Claude Code itself (Anthropic-provided skills
+# synced from the claude.ai account, re-created on every launch), so it is not
+# personal config either.
+SKILL_EXCLUDES=("${SYNC_COMMON_CLOUDFLARE_SKILLS[@]}" synced)
 
 # Top-level config files
 sync_common::sync_file "$SOURCE/CLAUDE.md"     "$DEST/CLAUDE.md"     "CLAUDE.md" || true
