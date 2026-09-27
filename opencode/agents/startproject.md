@@ -89,4 +89,5 @@ Researcher と Architect を **並列起動**。
 - tier=L かつリスクが高い
 
 Gate 1 発動時は計画を日本語で提示し、**判断が必要な理由と選択肢を明示**してユーザーに承認を求める。
+承認（または修正）が済んでから呼び出し元へ返す。最終レスポンスに `GATE1: auto-approved | approved | revised` を含める。
 

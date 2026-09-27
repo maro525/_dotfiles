@@ -1,5 +1,5 @@
 ---
-description: Deploy subagent — commit and push the work branch, create PR/MR via gh (GitHub) or glab (GitLab) CLI, update Linear. Without --task-file, runs a single ad-hoc git write operation (commit / push / branch / merge etc.).
+description: Deploy subagent — commit the reviewed changes, push the work branch, create the PR/MR via gh (GitHub) or glab (GitLab) CLI, update Linear. Without --task-file, runs a single ad-hoc git write operation (commit / push / branch / merge etc.).
 mode: subagent
 model: github-copilot/gpt-5.6-terra
 variant: low
@@ -41,7 +41,7 @@ $ARGUMENTS: "{task description} --tier={S|M|L} --task-file={TASK_FILE} --linear-
 ## 事前準備
 
 1. TASK_FILE の `## team-review` の最新回 — PASS/FAIL 判定・申し送り事項を確認
-2. TASK_FILE の `## Meta` の `branch:` — push する作業ブランチ
+2. TASK_FILE の `## Meta` の `branch:` / `base:` — push する作業ブランチと、その分岐元
 3. TASK_FILE の `## team-implement` — PR 本文に書く変更内容（複数回ある場合は全回）
 
 Review が FAIL の場合は PR を作らずに中止し、ユーザーに報告して終了。
@@ -68,7 +68,7 @@ Review が FAIL の場合は PR を作らずに中止し、ユーザーに報告
 
 ## STEP 3: CREATE PR / MR
 
-base は `branch:` のブランチの分岐元ブランチ（不明ならリポジトリのデフォルトブランチ）、タイトルは `feat({scope}): {task description}` 形式。
+base は `base:` のブランチ（空ならリポジトリのデフォルトブランチ）、タイトルは `{type}({scope}): {task description}` 形式。`{type}` は変更内容に合う Conventional Commits の型（feat / fix / refactor / docs など）。
 
 PR/MR 本文:
 - 変更の概要
@@ -80,7 +80,7 @@ PR/MR 本文:
 
 ## STEP 4: RETURN TO ORIGINAL BRANCH
 
-作業開始前のブランチに戻る。不明な場合はリポジトリのデフォルトブランチ。
+`base:` のブランチに戻る（空ならリポジトリのデフォルトブランチ）。
 
 ---
 

@@ -81,6 +81,7 @@ feature は LINEAR_ID のタスク内容から短いスネークケースで命�
 - created: {timestamp}
 - status: planning
 - branch:
+- base:
 
 ## startproject
 ### Brief
@@ -116,10 +117,8 @@ subagent を呼び出して計画フェーズを委譲する:
 
 startproject 内で質問が発生した場合はユーザーが回答。回答後は startproject が続行。
 
-**Gate 1:** startproject が自己判断で発動（詳細は `agents/startproject.md`）:
-- 自動承認 → 即 STEP 4
-- Gate 1 発動 → ユーザー承認を待つ。承認後即 STEP 4
-- 差し戻し → フィードバックをもとに計画を修正して再提示
+**Gate 1:** startproject が自己判断で発動し、ユーザーの承認（または修正）が済んでから返ってくる（詳細は `agents/startproject.md`）。
+返却後は `GATE1` の値に関わらず即 STEP 4 へ進む。`GATE1`（`auto-approved` / `approved` / `revised`）は STEP 7 の完了報告に含める。
 
 ---
 
@@ -133,19 +132,19 @@ startproject 内で質問が発生した場合はユーザーが回答。回答�
 @team-implement "{task description} --tier={tier} --task-file={TASK_FILE} --linear-id={LINEAR_ID}"
 ```
 
-team-implement は TASK_FILE の `## team-implement` に `### {n}回目` として追記し、`## Meta` の `branch:` に作業ブランチを記入する。変更はコミットしない（deploy がコミットする）。
+team-implement は TASK_FILE の `## team-implement` に `### {n}回目` として追記し、`## Meta` の `branch:` / `base:` に作業ブランチとその分岐元を記入する。変更はコミットしない（deploy がコミットする）。
 
 ### 4-1. エスカレーション
 
 team-implement が `ESCALATION: {新しい tier}: {理由}` を返した場合（tier の引き上げで中断した）:
 
 1. ユーザーに新しい tier と理由を報告する
-2. `tier` 変数と `## Meta` の `tier:` を更新し、`status` を `planning` に戻す
+2. `tier` 変数と `## Meta` の `tier:` を更新する（`status` は `implementing` のまま。`planning` に戻すと kanban が「status が古い」と警告するため）
 3. 新しい tier で STEP 3 からやり直す。startproject は `## startproject` を上書きする。作業ブランチ上の変更はそのまま引き継ぐ
 
 ### 4-2. 完了確認
 
-`ESCALATION` がなく、TASK_FILE の `## team-implement` の最新回と `branch:` が記入されていることを確認してから STEP 5 へ進む。
+`ESCALATION` がなく、TASK_FILE の `## team-implement` の最新回と `branch:` / `base:` が記入されていることを確認してから STEP 5 へ進む。
 
 ---
 
@@ -185,7 +184,7 @@ team-review は TASK_FILE の `## team-review` に `### {n}回目` として追�
 - Task File: {TASK_FILE}
 
 ### 各フェーズのサマリー
-- startproject: ...
+- startproject: ...（Gate 1: {GATE1}）
 - team-implement: ...
 - team-review: ...
 - deploy: ...
@@ -203,7 +202,7 @@ team-review は TASK_FILE の `## team-review` に `### {n}回目` として追�
 | `LINEAR_ID` | STEP 1 |
 | `TASK_FILE` | STEP 2 |
 
-作業ブランチは引数ではなく TASK_FILE の `## Meta` の `branch:` で受け渡す（STEP 4 で team-implement が記入）。
+作業ブランチとその分岐元は、引数ではなく TASK_FILE の `## Meta` の `branch:` / `base:` で受け渡す（STEP 4 で team-implement が記入）。
 
 ### TASK_FILE の `status`
 
@@ -215,7 +214,6 @@ team-review は TASK_FILE の `## team-review` に `### {n}回目` として追�
 | STEP 4 開始（Gate 2 で戻った場合も） | `implementing` |
 | STEP 5 開始 | `reviewing` |
 | STEP 6 開始 | `deploying` |
-| STEP 4-1 エスカレーション時 | `planning` |
 | STEP 7 | `in-review`（PR を出してマージ待ち） |
 
 ---

@@ -4,7 +4,9 @@ mode: subagent
 model: github-copilot/gpt-5.6-sol
 variant: xhigh
 permission:
-  edit: allow
+  edit:
+    "*": deny
+    "*.claude/docs/decisions/*": allow
 ---
 
 # team-review
