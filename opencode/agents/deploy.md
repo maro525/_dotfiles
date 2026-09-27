@@ -1,5 +1,5 @@
 ---
-description: Deploy subagent — push the work branch, create PR/MR via gh (GitHub) or glab (GitLab) CLI, update Linear. Without --task-file, runs a single ad-hoc git write operation (commit / push / branch / merge etc.).
+description: Deploy subagent — commit and push the work branch, create PR/MR via gh (GitHub) or glab (GitLab) CLI, update Linear. Without --task-file, runs a single ad-hoc git write operation (commit / push / branch / merge etc.).
 mode: subagent
 model: github-copilot/gpt-5.6-terra
 variant: low
@@ -28,7 +28,7 @@ $ARGUMENTS で指示された書き込み系 git 操作（`AGENTS.md` の「GIT 
 
 ## Deploy Workflow モード
 
-push と PR / MR 作成を担当する（動作検証は team-review で済んでいるので行わない）。前提: team-review 完了済み・PASS 判定済み。
+コミット・push・PR / MR 作成を担当する（動作検証は team-review で済んでいるので行わない）。前提: team-review 完了済み・PASS 判定済み。
 
 ## Input
 
@@ -54,9 +54,9 @@ Review が FAIL の場合は PR を作らずに中止し、ユーザーに報告
 
 ---
 
-## STEP 1: PRE-PUSH VERIFICATION
+## STEP 1: COMMIT
 
-未コミット変更がある場合はユーザーに確認する。
+作業ブランチ上の未コミット変更（team-implement の実装。レビュー通過済み）をコミットする。メッセージは `## team-implement` の内容から作る。
 
 ---
 

@@ -14,7 +14,7 @@ permission:
 ## Input
 
 ```
-$ARGUMENTS: "{task description} --tier={S|M|L} --task-file={TASK_FILE} --linear-id={LINEAR_ID} [--mode=self-review]"
+$ARGUMENTS: "{task description} --tier={S|M|L} --task-file={TASK_FILE} --linear-id={LINEAR_ID}"
 ```
 
 ---
@@ -24,7 +24,7 @@ $ARGUMENTS: "{task description} --tier={S|M|L} --task-file={TASK_FILE} --linear-
 1. TASK_FILE の `## startproject` > `### Brief` — スコープ・成功基準
 2. TASK_FILE の `## startproject` > `### Design` — 設計方針・意図
 3. TASK_FILE の `## team-implement` の最新回 — 実装サマリー・申し送り（差し戻し後は前回の `## team-review` の指摘が直っているかも確認する）
-4. 変更ファイル一覧
+4. 変更ファイル一覧（作業ブランチ上の未コミット変更。team-implement はコミットしない）
 
 **[MUST]** Linear MCP `save_comment` でレビュー開始コメント投稿。
 
@@ -39,11 +39,11 @@ $ARGUMENTS: "{task description} --tier={S|M|L} --task-file={TASK_FILE} --linear-
 
 ## STEP 1: コードレビュー（並列）
 
-tier に応じたレビュアーを同時に起動する。
+tier に応じたレビュアーを同時に起動する。**レビュー中はコードを変更しない**（修正は差し戻しで team-implement が行う）。
 
 | tier | レビュアー |
 |------|----------|
-| S（`--mode=self-review`） | Primary |
+| S | Primary |
 | M | Primary / Second Opinion / Security |
 | L | Primary / Second Opinion / Security / Simplify |
 
@@ -52,7 +52,7 @@ tier に応じたレビュアーを同時に起動する。
 | Primary | 変更ファイルを自分で直接読み、Quality / Logic の観点でレビュー |
 | Second Opinion | `task` tool で subagent を起動し、観点は Primary と同じ（別コンテキストでの独立したセカンドオピニオン）。severity 付きの指摘リストを返させる |
 | Security | `$HOME/.claude/rules/security.md` のルールを変更コードに照合し、違反・懸念を severity 付きで列挙 |
-| Simplify | 過剰な複雑さ・不要な抽象化・デッドコードを検出し、簡略化を提案 |
+| Simplify | 変更ファイルを読み、過剰な複雑さ・重複・再利用できる既存コードの観点で指摘する（コードを書き換えるスキルは使わない） |
 
 ---
 

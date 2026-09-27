@@ -35,6 +35,7 @@ tier は以下で判定する（`tier = max(file_tier, complexity_tier, risk_tie
 
 **エスカレーション（上方向のみ）:** 計画後・実装 30-40% 時点・レビュー前に tier を再評価する。
 ファイル数が閾値を超えた／未解決の設計問題が積み上がった／新依存を追加した／リスク次元が変わった（例: 想定外に認証コードに触れた）場合は tier を引き上げる。完了済みの作業はやり直さない。
+`/orchestrate` 内では team-implement が中断して `ESCALATION` を返し、orchestrate が tier を更新して startproject（計画）からやり直す。それまでのコード変更は作業ブランチに残し、やり直さずに続きから進める。
 
 ## ROUTING NOTES
 

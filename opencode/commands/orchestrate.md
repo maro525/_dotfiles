@@ -21,13 +21,14 @@ $ARGUMENTS の形式: "{task description}"
 
 - 全 STEP を自律的に順番に実行する
 - **[MUST]** の付いたステップは、どの tier でもスキップしない
+- Linear への投稿・ステータス変更に失敗したら、黙って飛ばさずユーザーに報告する
 
-**原則として止まるのは以下の Gate のみ。** ただし各フェーズが途中でユーザーに確認を求めた場合（tier のエスカレーション承認など）は、それに従う。
+**原則として止まるのは以下の Gate のみ。** ただし各フェーズが途中でユーザーに確認を求めた場合（startproject の要件ヒアリングなど）は、それに従う。
 
 | Gate | タイミング | 動作 |
 |------|-----------|------|
 | Gate 1 | startproject の計画提示後 | ユーザー承認を待つ |
-| Gate 3 | team-review の FAIL 時 | ユーザーに報告し判断を待つ |
+| Gate 2 | team-review の FAIL 時 | ユーザーに報告し判断を待つ |
 
 ## Git ルール
 
@@ -126,15 +127,25 @@ startproject 内で質問が発生した場合はユーザーが回答。回答�
 
 **完了次第即 STEP 5 へ。**
 
-開始時に TASK_FILE の `status` を `implementing` に、Linear のステータスを "In Progress" に変更する（変更できなかった場合はユーザーに報告する）。
+開始時に TASK_FILE の `status` を `implementing` に、Linear のステータスを "In Progress" に変更する。
 
 ```
 @team-implement "{task description} --tier={tier} --task-file={TASK_FILE} --linear-id={LINEAR_ID}"
 ```
 
-team-implement は TASK_FILE の `## team-implement` に `### {n}回目` として追記し、`## Meta` の `branch:` に作業ブランチを記入する。
+team-implement は TASK_FILE の `## team-implement` に `### {n}回目` として追記し、`## Meta` の `branch:` に作業ブランチを記入する。変更はコミットしない（deploy がコミットする）。
 
-**Gate 2 (内部):** TASK_FILE の `## team-implement` の最新回と `branch:` の記入を確認してから STEP 5。
+### 4-1. エスカレーション
+
+team-implement が `ESCALATION: {新しい tier}: {理由}` を返した場合（tier の引き上げで中断した）:
+
+1. ユーザーに新しい tier と理由を報告する
+2. `tier` 変数と `## Meta` の `tier:` を更新し、`status` を `planning` に戻す
+3. 新しい tier で STEP 3 からやり直す。startproject は `## startproject` を上書きする。作業ブランチ上の変更はそのまま引き継ぐ
+
+### 4-2. 完了確認
+
+`ESCALATION` がなく、TASK_FILE の `## team-implement` の最新回と `branch:` が記入されていることを確認してから STEP 5 へ進む。
 
 ---
 
@@ -144,11 +155,9 @@ team-implement は TASK_FILE の `## team-implement` に `### {n}回目` とし�
 @team-review "{task description} --tier={tier} --task-file={TASK_FILE} --linear-id={LINEAR_ID}"
 ```
 
-tier=S の場合は `--mode=self-review` を付ける。
+team-review は TASK_FILE の `## team-review` に `### {n}回目` として追記する（FAIL の場合も必ず書き込む）。Gate 2 で STEP 4 に戻ったら、次の実装・レビューは n+1 回目として追記する（上書きしない）。
 
-team-review は TASK_FILE の `## team-review` に `### {n}回目` として追記する（FAIL の場合も必ず書き込む）。Gate 3 で STEP 4 に戻ったら、次の実装・レビューは n+1 回目として追記する（上書きしない）。
-
-**Gate 3:**
+**Gate 2:**
 - PASS → 即 STEP 6
 - FAIL → ユーザーに報告し判断を待つ（STEP 4 に戻る場合は `status` を `implementing` に戻す）
 
@@ -198,15 +207,16 @@ team-review は TASK_FILE の `## team-review` に `### {n}回目` として追�
 
 ### TASK_FILE の `status`
 
-各 STEP の開始時に orchestrator が `## Meta` の `status` を更新する（フェーズ agent は更新しない）。
+各 STEP の開始時に orchestrator が `## Meta` の `status` を更新する（フェーズ agent は更新しない）。`done` には orchestrator はしない。PR がマージされた後に人間が変更する。
 
 | タイミング | status |
 |------|--------|
 | STEP 2（作成時） | `planning` |
-| STEP 4 開始（Gate 3 で戻った場合も） | `implementing` |
+| STEP 4 開始（Gate 2 で戻った場合も） | `implementing` |
 | STEP 5 開始 | `reviewing` |
 | STEP 6 開始 | `deploying` |
-| STEP 7 | `done` |
+| STEP 4-1 エスカレーション時 | `planning` |
+| STEP 7 | `in-review`（PR を出してマージ待ち） |
 
 ---
 

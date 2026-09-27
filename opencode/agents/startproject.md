@@ -9,7 +9,7 @@ permission:
 
 # startproject
 
-計画フェーズ（Phase 1–3）を担当。TASK_FILE を SSoT として更新する。
+計画フェーズ（Phase 1–3）を担当。TASK_FILE を SSoT として更新する。エスカレーションで再実行された場合は既存の `## startproject` を上書きする。
 
 ## Input
 
