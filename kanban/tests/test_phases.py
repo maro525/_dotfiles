@@ -94,6 +94,19 @@ def test_evidence_uses_decision_log_tags() -> None:
     assert evidence_phase(task) == "implementing"
 
 
+@pytest.mark.parametrize(
+    ("sections", "expected"),
+    [
+        (frozenset({"startproject"}), "planning"),
+        (frozenset({"startproject", "team-implement"}), "implementing"),
+        (frozenset({"startproject", "team-implement", "team-review"}), "review"),
+        (frozenset({"startproject", "team-implement", "team-review", "deploy"}), "deploy"),
+    ],
+)
+def test_evidence_uses_process_named_sections(sections: frozenset[str], expected: str) -> None:
+    assert evidence_phase(make_task(sections=sections)) == expected
+
+
 def test_evidence_none_when_no_signal() -> None:
     assert evidence_phase(make_task()) is None
 
