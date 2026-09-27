@@ -96,6 +96,7 @@ feature は LINEAR_ID のタスク内容から短いスネークケースで命�
 - created: {timestamp}
 - status: planning
 - branch:
+- base:
 
 ## startproject
 ### Brief
@@ -153,11 +154,8 @@ startproject 内で質問が発生した場合はユーザーが回答する。
 
 ### 3-4. Gate 1
 
-startproject が自己判断して発動する（詳細は startproject.md 参照）。返却の `GATE1` で判別する。
-
-- `auto-approved` → 即 STEP 4 へ進む
-- `approved` → startproject 内で承認済み。即 STEP 4 へ進む
-- `revised` → 修正後の計画。内容を確認して STEP 4 へ進む
+startproject が自己判断して発動し、ユーザーの承認（または修正）が済んでから返却してくる（詳細は startproject.md 参照）。
+返却後は `GATE1` の値に関わらず即 STEP 4 へ進む。`GATE1`（`auto-approved` / `approved` / `revised`）は STEP 7 の完了報告に含める。
 
 ---
 
@@ -174,7 +172,7 @@ startproject が自己判断して発動する（詳細は startproject.md 参�
 ```
 
 team-implement はコードと git 操作のみ行い、**TASK_FILE への書き込みと Linear 投稿は行わない**。
-結果を OUTPUT フォーマット（`IMPLEMENTATION_NOTES` / `LINEAR_COMMENT` / `BRANCH` / `ESCALATION`）で返してくる。
+結果を OUTPUT フォーマット（`IMPLEMENTATION_NOTES` / `LINEAR_COMMENT` / `BRANCH` / `BASE` / `ESCALATION`）で返してくる。
 
 ### 4-2. **[MUST]** 返却内容を書き込む
 
@@ -182,6 +180,7 @@ team-implement はコードと git 操作のみ行い、**TASK_FILE への書き
 |---|---|
 | `IMPLEMENTATION_NOTES` | TASK_FILE の `## team-implement` に `### {n}回目` として追記 |
 | `BRANCH` | TASK_FILE の `## Meta` の `branch:` |
+| `BASE` | TASK_FILE の `## Meta` の `base:` |
 
 ### 4-3. **[MUST]** Linear にコメントを投稿する
 
@@ -192,7 +191,7 @@ team-implement はコードと git 操作のみ行い、**TASK_FILE への書き
 返却に `ESCALATION` がある場合（team-implement が tier の引き上げで中断した）:
 
 1. ユーザーに新しい tier と理由を報告する
-2. `tier` 変数と `## Meta` の `tier:` を更新し、`status` を `planning` に戻す
+2. `tier` 変数と `## Meta` の `tier:` を更新する（`status` は `implementing` のまま。`planning` に戻すと kanban が「status が古い」と警告するため）
 3. 新しい tier で STEP 3 からやり直す。startproject の返却で `## startproject` を上書きする。作業ブランチ上の変更はそのまま引き継ぐ
 
 ### 4-5. 完了確認
@@ -244,7 +243,7 @@ team-review は **TASK_FILE への書き込みと Linear 投稿を行わない**
 ```
 
 deploy はコミット・push・PR・MR 作成のみ行い、**TASK_FILE への書き込みと Linear 操作は行わない**。
-結果を OUTPUT フォーマット（`DEPLOY` / `LINEAR_COMMENT` / `LINEAR_STATUS`）で返してくる。
+結果を OUTPUT フォーマット（`DEPLOY` / `LINEAR_COMMENT`）で返してくる。
 
 ### 6-2. **[MUST]** 返却内容を書き込む
 
@@ -254,7 +253,7 @@ deploy はコミット・push・PR・MR 作成のみ行い、**TASK_FILE への�
 
 ### 6-3. **[MUST]** Linear にコメント投稿 + ステータス変更
 
-`LINEAR_COMMENT` を投稿し、ステータスを `LINEAR_STATUS`（通常は "In Review"）に変更する。
+`LINEAR_COMMENT` を投稿し、ステータスを "In Review" に変更する。
 
 ---
 
@@ -270,7 +269,7 @@ deploy はコミット・push・PR・MR 作成のみ行い、**TASK_FILE への�
 - Task File: {TASK_FILE}
 
 ### 各フェーズのサマリー
-- startproject: ...
+- startproject: ...（Gate 1: {GATE1}）
 - team-implement: ...
 - team-review: ...
 - deploy: ...
@@ -288,7 +287,7 @@ orchestrator は以下を変数として保持し、全 command に引数で渡�
 | `LINEAR_ID` | STEP 1 |
 | `TASK_FILE` | STEP 2 |
 
-作業ブランチは引数ではなく TASK_FILE の `## Meta` の `branch:` で受け渡す（STEP 4 で記入）。
+作業ブランチとその分岐元は、引数ではなく TASK_FILE の `## Meta` の `branch:` / `base:` で受け渡す（STEP 4 で記入）。
 
 ### TASK_FILE の `status`
 

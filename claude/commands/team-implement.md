@@ -10,7 +10,7 @@ allowed-tools: Read, Write, Edit, Bash, Grep, Glob, Agent, Skill, AskUserQuestio
 
 # team-implement
 
-実装フェーズを担当。コード（実装・テスト）の読み書きと git 操作は自分で行う。
+実装フェーズを担当。コード（実装・テスト）の読み書きと作業ブランチの作成は自分で行う（コミットはしない）。
 
 **TASK_FILE への書き込みと Linear への投稿は行わない。**
 実装結果は OUTPUT フォーマットで呼び出し元（`/orchestrate` STEP 4）に返し、
@@ -95,6 +95,9 @@ Plan のタスクがすべて完了し、テストがすべて通過したら OU
 
 ### BRANCH
 feature/{feature-name}
+
+### BASE
+（作業ブランチを切ったときにいたブランチ。差し戻し時は `## Meta` の `base:` をそのまま返す）
 
 ### ESCALATION
 （中断した場合のみ）{新しい tier}: {理由}

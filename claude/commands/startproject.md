@@ -32,7 +32,7 @@ $ARGUMENTS の形式: "{task description} --tier={S|M|L} --task-file={TASK_FILE}
 
 | 引数 | 説明 |
 |---|---|
-| `--tier` | orchestrator が判定済み。省略時は S |
+| `--tier` | orchestrator が判定済み |
 | `--task-file` | orchestrator が作成済みのタスクファイルパス（Read のみ。書き込みは呼び出し元） |
 | `--linear-id` | orchestrator が確認済みの Linear タスク ID |
 

@@ -1,6 +1,6 @@
 ---
 name: deploy
-description: Deploy phase — push feature branch, create PR, return a deploy payload. The caller writes TASK_FILE and updates Linear. Called by /orchestrate with tier, task-file, linear-id. Without --task-file, runs a single ad-hoc git write operation (commit / push / branch / merge etc.).
+description: Deploy phase — commit the reviewed changes, push the work branch, create the PR/MR, return a deploy payload. The caller writes TASK_FILE and updates Linear. Called by /orchestrate with tier, task-file, linear-id. Without --task-file, runs a single ad-hoc git write operation (commit / push / branch / merge etc.).
 context: fork
 agent: general-purpose
 model: haiku
@@ -57,7 +57,7 @@ $ARGUMENTS の形式: "{task description} --tier={S|M|L} --task-file={TASK_FILE}
 開始前に必ず以下を読む。
 
 1. TASK_FILE の `## team-review` の最新回 — PASS/FAIL 判定・申し送り事項を確認
-2. TASK_FILE の `## Meta` の `branch:` — push する作業ブランチ
+2. TASK_FILE の `## Meta` の `branch:` / `base:` — push する作業ブランチと、その分岐元
 3. TASK_FILE の `## team-implement` — PR 本文に書く変更内容（複数回ある場合は全回）
 
 Review が FAIL の場合は PR を作らずに中止し、ユーザーに報告して終了する。
@@ -84,7 +84,7 @@ Review が FAIL の場合は PR を作らずに中止し、ユーザーに報告
 
 ## STEP 3: CREATE PR / MR
 
-base は feature ブランチの分岐元ブランチ（不明ならリポジトリのデフォルトブランチ）、タイトルは `feat({scope}): {task description}` 形式。
+base は `base:` のブランチ（空ならリポジトリのデフォルトブランチ）、タイトルは `{type}({scope}): {task description}` 形式。`{type}` は変更内容に合う Conventional Commits の型（feat / fix / refactor / docs など）。
 
 PR/MR 本文に含める内容:
 - 変更の概要
@@ -96,7 +96,7 @@ PR/MR 本文に含める内容:
 
 ## STEP 4: RETURN TO ORIGINAL BRANCH
 
-作業開始前のブランチに戻る。不明な場合はリポジトリのデフォルトブランチ。
+`base:` のブランチに戻る（空ならリポジトリのデフォルトブランチ）。
 
 ---
 
@@ -122,7 +122,4 @@ PR/MR 本文に含める内容:
 - コミット履歴（`git log --oneline` の出力）
 - team-review の結果サマリー
 - PR/MR リンク
-
-### LINEAR_STATUS
-In Review
 ```

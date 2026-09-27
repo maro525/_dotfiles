@@ -5,7 +5,7 @@ context: fork
 agent: general-purpose
 model: opus
 color: yellow
-allowed-tools: Read, Write, Edit, Bash, Grep, Glob, Agent, Skill, AskUserQuestion, TodoWrite, mcp__linear-server__get_issue
+allowed-tools: Read, Write, Bash, Grep, Glob, Agent, Skill, AskUserQuestion, TodoWrite, mcp__linear-server__get_issue
 ---
 
 # team-review
