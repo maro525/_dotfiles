@@ -4,7 +4,9 @@ UserPromptSubmit hook: route user prompts to a skill or agent.
 
 Priority: explicit command (/orchestrate etc.) > skill intent (-> /orchestrate)
 > agent intent (OpenCode / firecrawl MCP / Explore) > none.
-Lightweight tasks (questions, single-file edits) are excluded.
+Lightweight-task exclusion is currently disabled: is_lightweight_task() always
+returns False when a skill trigger matched, so any skill trigger yields a
+suggestion (the question / single-file patterns below are dead code for now).
 
 Output: additionalContext with a soft recommendation.
 """
@@ -304,7 +306,10 @@ def has_explicit_skill(prompt: str) -> bool:
     return bool(EXPLICIT_SKILL_RE.search(prompt.strip()))
 
 
-def is_lightweight_task(prompt: str) -> bool:
+def is_lightweight_task(prompt: str, has_skill_trigger: bool = False) -> bool:
+    if has_skill_trigger:
+        return False
+
     prompt_lower = prompt.lower()
 
     for patterns in QUESTION_PATTERNS.values():
@@ -410,7 +415,7 @@ def route_prompt(prompt: str) -> dict | None:
 
     # 2. Check for skill intent
     skill, trigger = detect_skill_intent(prompt)
-    if skill and not is_lightweight_task(prompt):
+    if skill and not is_lightweight_task(prompt, has_skill_trigger=True):
         prompt_summary = prompt.strip()[:80]
         if len(prompt.strip()) > 80:
             prompt_summary += "..."
@@ -451,7 +456,7 @@ def route_prompt(prompt: str) -> dict | None:
                     f"[Agent Routing] Detected '{trigger}' - run external "
                     "research on two parallel tracks via subagents: firecrawl MCP "
                     "(firecrawl_search / firecrawl_scrape) for sourced facts, and "
-                    "`opencode run --agent plan -m github-copilot/gpt-5.6-sol` "
+                    "`timeout -k 1m 20m opencode run --agent plan -m github-copilot/gpt-5.6-sol` "
                     "for implementation know-how (keep --agent plan, no 2>/dev/null, "
                     "run in the background). Prefer firecrawl when they disagree."
                 ),
