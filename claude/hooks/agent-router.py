@@ -129,66 +129,6 @@ TEAM_REVIEW_TRIGGERS = {
     ],
 }
 
-FS_OPS_TRIGGERS = {
-    "ja": [
-        "ディレクトリを作",
-        "フォルダを作",
-        "フォルダ作成",
-        "ディレクトリ作成",
-        "mkdir",
-        "ファイルを削除",
-        "ディレクトリを削除",
-        "フォルダを削除",
-        "ファイルを消して",
-        "ディレクトリを消して",
-        "フォルダを消して",
-        "rmして",
-        "rm -rf",
-        "ファイルを移動",
-        "ファイルを動かして",
-        "ディレクトリを移動",
-        "フォルダを移動",
-        "mvして",
-        "ファイルをコピー",
-        "コピーして",
-        "cpして",
-        "シンボリックリンク",
-        "リンクを作",
-        "パーミッション",
-        "権限を変",
-        "chmodして",
-        "touchして",
-        "ファイル整理",
-        "ディレクトリ構造",
-        "フォルダ構造",
-    ],
-    "en": [
-        "mkdir",
-        "make directory",
-        "create directory",
-        "create folder",
-        "rm ",
-        "rm -rf",
-        "remove file",
-        "remove directory",
-        "delete file",
-        "delete folder",
-        "delete directory",
-        "move file",
-        "move directory",
-        "mv ",
-        "copy file",
-        "copy directory",
-        "cp ",
-        "symlink",
-        "symbolic link",
-        "chmod",
-        "touch ",
-        "restructure",
-        "reorganize files",
-    ],
-}
-
 DEPLOY_TRIGGERS = {
     "ja": [
         "デプロイ",
@@ -207,23 +147,10 @@ DEPLOY_TRIGGERS = {
         "ブランチを作",
         "ブランチを変",
         "チェックアウト",
-        "git log",
-        "git diff",
-        "git show",
-        "git blame",
         "git stash",
         "git rebase",
-        "差分を見",
-        "差分を表示",
-        "履歴を見",
-        "履歴を表示",
-        "履歴を調べ",
-        "ログを見",
-        "ログを表示",
-        "blameして",
         "stashして",
         "pullして",
-        "fetchして",
         "タグを",
         "cherry-pick",
     ],
@@ -244,18 +171,9 @@ DEPLOY_TRIGGERS = {
         "create branch",
         "switch branch",
         "checkout",
-        "git log",
-        "git diff",
-        "git show",
-        "git blame",
         "git stash",
         "git rebase",
-        "show diff",
-        "show the diff",
-        "show log",
-        "show history",
         "git pull",
-        "git fetch",
         "git tag",
         "cherry-pick",
     ],
@@ -373,7 +291,7 @@ LIGHTWEIGHT_OPERATION_PATTERNS = {
 
 # Explicit skill command pattern — includes /orchestrate as primary entry point
 EXPLICIT_SKILL_RE = re.compile(
-    r"^/(?:orchestrate|startproject|team-implement|team-review|deploy|fs-ops)\b",
+    r"^/(?:orchestrate|startproject|team-implement|team-review|deploy)\b",
     re.IGNORECASE,
 )
 
@@ -422,7 +340,6 @@ def detect_skill_intent(prompt: str) -> tuple[str | None, str]:
         ("startproject", STARTPROJECT_TRIGGERS),
         ("team-implement", TEAM_IMPLEMENT_TRIGGERS),
         ("team-review", TEAM_REVIEW_TRIGGERS),
-        ("fs-ops", FS_OPS_TRIGGERS),
         ("deploy", DEPLOY_TRIGGERS),
     ]
 
@@ -472,25 +389,21 @@ SKILL_DESCRIPTIONS = {
     ),
     "team-implement": (
         "[Skill Routing] Detected implementation intent (trigger: '{trigger}'). "
-        "If starting fresh, use `/orchestrate` for the full workflow. "
-        "To resume implementation only: /team-implement"
+        "Use `/orchestrate` for the full workflow "
+        "(phase commands such as /team-implement only work when called by /orchestrate). "
+        "Run: /orchestrate {prompt_summary}"
     ),
     "team-review": (
         "[Skill Routing] Detected review intent (trigger: '{trigger}'). "
-        "If starting fresh, use `/orchestrate` for the full workflow. "
-        "To run review only: /team-review"
+        "Use `/orchestrate` for the full workflow "
+        "(phase commands such as /team-review only work when called by /orchestrate). "
+        "Run: /orchestrate {prompt_summary}"
     ),
     # deploy は git 単体操作もあるので /deploy を残しつつ /orchestrate も案内
     "deploy": (
         "[Skill Routing] Detected git/deploy intent (trigger: '{trigger}'). "
-        "For git operations only (commit, push, PR, log, diff, etc.): /deploy\n"
+        "For git write operations only (commit, push, PR, branch, merge, etc.): /deploy\n"
         "For full project workflow: /orchestrate {prompt_summary}"
-    ),
-    # fs-ops はそのまま独立
-    "fs-ops": (
-        "[Skill Routing] Detected filesystem operation intent (trigger: '{trigger}'). "
-        "Use `/fs-ops` for safe filesystem operations with impact analysis. "
-        "Run: /fs-ops {prompt_summary}"
     ),
 }
 

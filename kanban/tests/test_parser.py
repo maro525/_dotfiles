@@ -72,6 +72,45 @@ def test_comment_only_sections_count_as_empty() -> None:
     assert "review" not in task.filled_sections
 
 
+PROCESS_SECTIONS = textwrap.dedent(
+    """\
+    # Task: ABC-7 — new layout
+
+    ## Meta
+    - linear_id: ABC-7
+    - tier: M
+    - status: reviewing
+
+    ## startproject
+    ### Brief
+    Goal and scope.
+    ### Design
+    Chose approach A.
+    ### Plan
+    1. do it
+
+    ## team-implement
+    Implemented the thing.
+
+    ## team-review
+    <!-- orchestrator が記入 -->
+
+    ## deploy
+    <!-- orchestrator が記入 -->
+    """
+)
+
+
+def test_process_named_sections_are_split_on_level_two_only() -> None:
+    task = parse(PROCESS_SECTIONS, "/r/.claude/docs/decisions/task-ABC-7-new.md")
+    assert "startproject" in task.filled_sections
+    assert "team-implement" in task.filled_sections
+    # `### Design` stays inside `## startproject`, not a section of its own.
+    assert "design" not in task.filled_sections
+    assert "team-review" not in task.filled_sections
+    assert "deploy" not in task.filled_sections
+
+
 def test_decision_tags_read_from_list_prefixes_only() -> None:
     assert parse(CANONICAL).decision_tags == frozenset({"startproject", "team-implement"})
 

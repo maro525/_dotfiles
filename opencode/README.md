@@ -55,15 +55,16 @@ Claude Code 版と完全に一致しない点:
 | `AskUserQuestion` / `TodoWrite` ツール | あり | `todowrite` は OpenCode にもあり / 質問は通常の対話で代替 |
 | `Agent` tool（サブエージェント起動） | あり | `task` tool / `@agent` mention |
 | Linear MCP | `mcp__linear-server__*` | 同 MCP をそのまま利用可能 |
-| agent-browser MCP | あり | 同 MCP または Playwright MCP |
+| ブラウザ確認 | ツール指定なし | ツール指定なし |
 | `/simplify` など design skills | あり | 未移植（必要なら個別移植） |
+| OpenCode セカンドオピニオン（team-review） | `opencode run` で別モデル | `task` subagent（別コンテキスト）で代替 |
+| 共通ルール（tier 基準・Git ルール） | `~/.claude/rules/*.md` | `AGENTS.md` に集約 |
 
 ## Limitations
 
 1. **自動ルーティングなし**: Claude Code の `agent-router.py` 相当が OpenCode にないため、ユーザーは明示的に `/orchestrate` を呼ぶ必要がある。
 2. **スキル間呼出しの制約**: OpenCode のコマンドは他のコマンドを直接呼べない。orchestrate はサブエージェント `@` mention で連鎖させる設計。
 3. **`context: fork` の完全一致不可**: `subtask: true` で近似するが、親子間のトークン共有挙動は若干異なる。
-4. **DONT-ASK MODE**: Claude Code 側の環境変数連動（`CLAUDE_CODE_DISABLE_ADAPTIVE_THINKING` など）は OpenCode にない。必要なら agent 内で環境変数チェックを明示的に実装する。
 
 ## Testing
 

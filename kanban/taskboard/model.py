@@ -24,19 +24,8 @@ PHASE_ORDER: tuple[Phase, ...] = (
 
 PHASE_RANK: dict[Phase, int] = {name: i for i, name in enumerate(PHASE_ORDER)}
 
-#: Canonical TASK_FILE sections, as written by /orchestrate and the
-#: startproject / team-implement / team-review / deploy skills.
-CANONICAL_SECTIONS: tuple[str, ...] = (
-    "meta",
-    "brief",
-    "decision log",
-    "design",
-    "implementation notes",
-    "review",
-    "deploy",
-)
-
-#: Decision Log entry prefixes, e.g. `- [team-implement] POST: ...`.
+#: Decision Log entry prefixes, e.g. `- [team-implement] POST: ...`. Only
+#: files written before the Decision Log was dropped carry these.
 DECISION_TAGS: tuple[str, ...] = (
     "orchestrate",
     "startproject",

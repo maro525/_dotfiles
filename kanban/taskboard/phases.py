@@ -10,8 +10,9 @@ line, because only `/orchestrate` ever wrote it.
 So a card's column is the furthest-along of two independent signals:
 
   declared  -- the normalized `status:` field
-  evidence  -- which sections hold real content, plus which Decision Log
-               entry prefixes are present
+  evidence  -- which process sections hold real content, plus (in files
+               written before the Decision Log was dropped) which Decision
+               Log entry prefixes are present
 
 with one asymmetry: `done` is a claim about intent that no amount of file
 content can prove, so only `declared` may assert it.
@@ -27,11 +28,19 @@ from .model import PHASE_RANK, Card, ParsedTask, Phase
 #: specific states must precede the generic ones they contain.
 _STATUS_RULES: tuple[tuple[re.Pattern[str], Phase], ...] = (
     (re.compile(r"\b(?:done|complete|completed|closed|shipped|finished)\b"), "done"),
-    (re.compile(r"\b(?:deploy|deployed|deploying|merged|merging|released)\b"), "deploy"),
+    # `in-review` / `pr-open` mean the PR is open and awaiting merge -- the
+    # state /orchestrate leaves a task in -- so they belong to deploy, not to
+    # the review phase (`reviewing`).
     (
         re.compile(
-            r"\b(?:in[-_ ]?review|reviewing|reviewed|review|pr[-_ ]?open|"
-            r"awaiting[-_ ]?review|ready[-_ ]?for[-_ ]?review)\b"
+            r"\b(?:deploy|deployed|deploying|merged|merging|released|"
+            r"in[-_ ]?review|pr[-_ ]?open)\b"
+        ),
+        "deploy",
+    ),
+    (
+        re.compile(
+            r"\b(?:reviewing|reviewed|review|awaiting[-_ ]?review|ready[-_ ]?for[-_ ]?review)\b"
         ),
         "review",
     ),
@@ -49,12 +58,15 @@ _STATUS_RULES: tuple[tuple[re.Pattern[str], Phase], ...] = (
 )
 
 #: Evidence rules, checked from the furthest-along phase backwards. A phase is
-#: reached when its section holds real content or its skill logged a decision.
-_EVIDENCE_RULES: tuple[tuple[Phase, str, str], ...] = (
-    ("deploy", "deploy", "deploy"),
-    ("review", "review", "team-review"),
-    ("implementing", "implementation notes", "team-implement"),
-    ("planning", "brief", "startproject"),
+#: reached when one of its sections holds real content or its skill logged a
+#: decision. Sections are named after the process that fills them
+#: (`## team-implement`); the older names (`## Implementation Notes`) and the
+#: Decision Log tags are still accepted so existing files keep their column.
+_EVIDENCE_RULES: tuple[tuple[Phase, frozenset[str], str], ...] = (
+    ("deploy", frozenset({"deploy"}), "deploy"),
+    ("review", frozenset({"team-review", "review"}), "team-review"),
+    ("implementing", frozenset({"team-implement", "implementation notes"}), "team-implement"),
+    ("planning", frozenset({"startproject", "brief"}), "startproject"),
 )
 
 #: Markdown emphasis to drop before matching. Underscore is deliberately *not*
@@ -107,10 +119,10 @@ def evidence_phase(task: ParsedTask) -> Phase | None:
     Never returns `done`: completion is a declaration, not something the
     presence of content can demonstrate.
     """
-    for phase, section, tag in _EVIDENCE_RULES:
-        if section in task.filled_sections or tag in task.decision_tags:
+    for phase, sections, tag in _EVIDENCE_RULES:
+        if sections & task.filled_sections or tag in task.decision_tags:
             return phase
-    # A Design section alone still means planning happened.
+    # Legacy: a `## Design` section alone still means planning happened.
     if "design" in task.filled_sections or "orchestrate" in task.decision_tags:
         return "planning"
     return None

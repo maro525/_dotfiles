@@ -1,75 +1,31 @@
 # Tool Routing Rules
 
-**Defines which tools and operations are delegated to which agent, and how skills are auto-routed.**
+**Defines which tools and operations are delegated to which agent.**
 
-This file provides cross-cutting routing decisions.
-外部リサーチは firecrawl MCP + OpenCode リサーチの二系統、設計相談は OpenCode、コードベース解析は Explore サブエージェントに振り分ける。
+外部リサーチは firecrawl MCP + OpenCode リサーチの二系統、設計相談は OpenCode に振り分ける。
 
-## Skill Auto-Routing
+## Skill Routing hook への応答
 
-**ユーザーがスキル名を明示しなくても、`UserPromptSubmit` hook (`agent-router.py`) がプロンプトを分析し、適切なスキルを `additionalContext` で提案する。**
+`agent-router.py`（UserPromptSubmit hook）がスキル候補を `[Skill Routing]` として additionalContext に出す。ソフトな推奨として扱う。
 
-→ 詳細: `.claude/rules/skill-auto-routing.md`
-
-### ルーティング優先順位
-
-```
-1. 明示的スキルコマンド (/startproject 等) → そのまま実行
-2. スキル意図検出 + 軽量タスクでない → スキルを提案
-3. エージェント意図検出 (OpenCode / firecrawl MCP / Explore) → エージェントを提案
-4. いずれにも該当しない → 通常応答
-```
-
-### スキル意図の発火条件
-
-| スキル | 典型的なトリガー |
-|--------|----------------|
-| `/startproject` | 「新機能を作りたい」「issue #Nを進めたい」「計画して」 |
-| `/team-implement` | 「実装して」「承認します」「この計画で進めて」 |
-| `/team-review` | 「レビューして」「品質チェック」「実装完了」 |
-| `/fs-ops` | 「ディレクトリを作って」「ファイルを削除して」「移動して」 |
-| `/deploy` | 「PRを作って」「pushして」「デプロイ」 |
-
-### 発火しないケース
-
-- 質問・説明依頼
-- 単発の軽微な操作（コミット、lint、テスト実行など）
-- 短すぎるプロンプト（5文字未満）
-
-## `context: fork` スキルの直接実行
-
-以下のスキルは `context: fork` で実行され、メインのルーティングフックを経由しない。
-スキル内では git/ruff/uv/gh 等を直接実行する（サブエージェント経由不要）：
-
-| スキル | 直接実行する操作 |
-|--------|----------------|
-| `/team-implement` | git checkout/branch、ruff、pytest、uv |
-| `/team-review` | git diff/log、pytest、ruff |
-| `/fs-ops` | mkdir、rm、cp、mv、chmod、ln、touch |
-| `/deploy` | git push、gh pr create、git checkout |
+- **従う**: プロンプトの意図と一致し、ユーザーの明示指示と矛盾しない場合。提案に従う旨を一言伝えてから Skill ツールで起動する
+- **従わなくてよい**: ユーザーが別のことを明示している／提案スキルに対してタスクが小さすぎる（XS など）／進行中ワークフロー内の追加質問
+- 提案がずれていると思ったら、理由を伝えてユーザーに確認する
 
 ## Adaptive Execution Override
 
-> 参照: `.claude/rules/adaptive-execution.md`
-
-ルーティングルールはタスクサイズに応じて適応される：
-
-- **XS/S タスク**: OpenCode / firecrawl への委託は不要。Claude が直接対応する。
-- **M タスク**: 必要な場合のみ OpenCode サブエージェントで設計相談。外部リサーチ（firecrawl + OpenCode）は未知のライブラリ・外部 API がある場合のみ。
-- **L タスク**: フルルーティング（全ルール適用）。
+tier ごとに外部リサーチ・OpenCode を使うかどうかは `$HOME/.claude/rules/adaptive-execution.md` の「External Research」「OpenCode Design Consultation」に従う。以下のルーティングは、そこで「使う」となった場合の委譲先を定める。
 
 ## Routing Table
 
 | Operation | Delegate To | Method |
 |-----------|-------------|--------|
 | External research | **firecrawl MCP + OpenCode** | 二系統を並列実行し Claude が統合（下記セクション参照） |
-| PDF / 画像 (ローカル) | **Claude 直接** | Read ツール（PDF・画像はネイティブ対応） |
 | PDF / 記事 (URL) | **firecrawl MCP** | `firecrawl_parse` / `firecrawl_scrape` |
 | 音声・動画 | **未対応** | 委託先なし。ユーザーに扱い方を確認する |
-| Codebase analysis | **Explore subagent** | `Explore`（推奨）or `general-purpose` |
 | Library research | **firecrawl MCP + OpenCode** | `firecrawl_search` で一次情報 + OpenCode で実装知見 |
 | Design decisions | **OpenCode** | Subagent（`opencode run --agent plan -m github-copilot/gpt-5.6-sol`） |
-| git (all operations) | **`/deploy` skill** | Deploy Workflow or Ad-hoc Git モード |
+| git（書き込み系） | **`/deploy` skill** | Ad-hoc Git モード。読み取り系は Claude が直接 |
 | docker/ruff/uv (in `context: fork` skills) | **Direct** | スキル内で直接実行 |
 | docker/ruff/uv (ad-hoc) | **Subagent** | サブエージェント経由で直接実行 |
 | GitHub MCP / Linear MCP | **Direct or Subagent** | スキル内は直接、アドホックはサブエージェント |
@@ -83,7 +39,7 @@ This file provides cross-cutting routing decisions.
 | **一次情報** | firecrawl MCP | 公式ドキュメント・リリースノートの実文面。出典 URL が取れる |
 | **実装知見** | OpenCode CLI | 学習済み知識に基づく設計上の勘所・落とし穴・比較 |
 
-**併用の理由**: firecrawl は「現在の事実」を出典付きで取れるが解釈はしない。OpenCode は解釈と経験則を出せるが出典を持たない。両者が食い違った場合は **firecrawl の一次情報を優先**し、相違点を Decision Log に残す。
+**併用の理由**: firecrawl は「現在の事実」を出典付きで取れるが解釈はしない。OpenCode は解釈と経験則を出せるが出典を持たない。両者が食い違った場合は **firecrawl の一次情報を優先**し、相違点と採用した方を記録する（`/startproject` では TASK_FILE の `### Design`）。
 
 ### OpenCode リサーチの実行
 
@@ -157,7 +113,7 @@ Task tool parameters:
     opencode run --agent plan -m github-copilot/gpt-5.6-sol "{research question}" < /dev/null
 
     Keep `--agent plan` and the `< /dev/null`, and do NOT append 2>/dev/null — see
-    "OpenCode リサーチの実行" in rules/tool-routing.md for why.
+    "OpenCode リサーチの実行" in $HOME/.claude/rules/tool-routing.md for why.
     Expect this to take over 10 minutes.
 
     Save full output to: .claude/docs/research/{topic}-opencode.md
@@ -165,7 +121,7 @@ Task tool parameters:
     so it can be checked against the firecrawl sources.
 ```
 
-両者の結果を Claude が統合する。**食い違いがあれば firecrawl の一次情報を採用**し、相違点を TASK_FILE の Decision Log に記録する。
+両者の結果を Claude が統合する。**食い違いがあれば firecrawl の一次情報を採用**し、相違点と採用した方を記録する。
 
 ### Triggers
 
@@ -178,124 +134,28 @@ Task tool parameters:
 ### Exceptions (Claude handles directly)
 
 - URL が 1 本だけ分かっていて要約するだけ（WebFetch で足りる）
-- ローカルの PDF / 画像の読み取り（Read ツールがネイティブ対応）
-
-## Codebase Analysis via Explore Subagent
-
-コードベース解析は Explore サブエージェント（ローカルツールのみ、Web アクセスなし）に振り分ける。
-
-### Scope
-
-- Repository-wide architecture analysis
-- Cross-module dependency understanding
-- Pattern discovery across the codebase
-- Data flow and impact analysis
-- Code structure overview
-
-### How to Route
-
-```
-Task tool parameters:
-- subagent_type: "Explore"  (preferred; general-purpose if edits are needed)
-- run_in_background: true
-- prompt: |
-    Analyze the codebase: {description}
-
-    Use Grep/Glob/Read to map structure, then read the key files in detail.
-    Specify search breadth ("medium" / "very thorough") explicitly.
-
-    Save full output to: .claude/docs/research/{topic}.md
-    Return CONCISE summary.
-```
-
-### Triggers
-
-| User Input | Action |
-|------------|--------|
-| 「コードベースを理解して」「アーキテクチャ分析して」 | Explore サブエージェントに委託 |
-| 「コード全体を見て」「横断的に分析して」 | Explore サブエージェントに委託 |
-| 「依存関係を調べて」「影響範囲を分析して」 | Explore サブエージェントに委託 |
-
-### Exceptions (Claude handles directly)
-
-- Reading a specific single file (Read tool)
-- Searching for a specific symbol/function (Grep/Glob tools)
-- Quick reference during implementation (targeted file reads)
 
 ## Git Operations
 
-**全てのアドホック git 操作は `/deploy` スキル経由で実行する。**
+**書き込み系の git 操作は `/deploy`（Ad-hoc Git モード）経由で実行する。読み取り系は Claude が直接実行してよい。**
 
-`/deploy` スキルは 2 つのモードを持つ:
-- **Deploy Workflow モード**: PR 作成 + push + Linear 投稿（従来の deploy フロー）
-- **Ad-hoc Git モード**: 単発の git 操作（commit, log, diff, branch 等）
+| 分類 | コマンド | 実行者 |
+|------|---------|--------|
+| **書き込み** | `add`, `commit`, `push`, `pull`, `merge`, `rebase`, `cherry-pick`, `tag`（作成）, `stash`（push/pop/apply）, `reset`, `revert`, `branch`（作成）, `checkout`, `switch` | `/deploy` |
+| **読み取り** | `status`, `log`, `diff`, `show`, `blame`, `branch`（一覧）, `fetch`, `stash list/show`, `rev-parse`, `config --get` | Claude が直接 |
 
-### Push/Pull 分類（Ad-hoc Git モード）
+`/team-implement` `/team-review` `/deploy` の fork 内では、書き込み系も直接実行する。
 
-Ad-hoc Git モードでは、操作を **Push-type（書き込み）** と **Pull-type（読み取り）** に分類する：
+### 保護ブランチ
 
-| 分類 | コマンド | 特徴 |
-|------|---------|------|
-| **Push-type（書き込み）** | `git add`, `git commit`, `git push`, `git merge`, `git rebase`, `git cherry-pick`, `git tag`（作成）, `git stash pop/apply`, `git reset`, `git revert` | リポジトリの状態を変更する |
-| **Pull-type（読み取り）** | `git log`, `git diff`, `git show`, `git blame`, `git status`, `git branch`（一覧）, `git pull`, `git fetch`, `git stash list/show` | リポジトリの状態を読み取るのみ |
+- **`release` / `staging` / `main`（master 含む）への直接コミット・push は、ユーザーの明示的な許可がない限り禁止**。反映は必ず PR / MR 経由
+- 保護ブランチ上で書き込み操作が必要になったら、feature ブランチを作成してから実行する（tier=XS も同様）
 
-**main ブランチ保護**: Push-type 操作で main/master 上にいる場合、feature ブランチを自動作成してから実行する。Pull-type 操作にはブランチ制限なし。
+### ホスティング CLI
 
-→ 詳細: `.claude/skills/deploy/SKILL.md`
-
-### `context: fork` スキル内
-
-`/team-implement`, `/team-review`, `/deploy` はスキル内で git コマンドを直接実行する。
-
-### アドホック操作
-
-スキル外でのアドホックな git 操作は **`/deploy` スキル（Ad-hoc Git モード）** 経由で実行する。
-`/deploy` は `context: fork` で動作するため、コンテキスト分離が保証される。
-
-#### Claude が直接実行してよい操作（例外）
-
-- `git status`（現在の状態確認のみ）
-- `git branch --show-current`（現在のブランチ名取得）
-- `git rev-parse`, `git config --get`（情報取得）
-- `.gitignore` 等の設定ファイル読み取り（Read ツール経由）
-
-#### `/deploy` スキル経由で実行する操作
-
-| 操作 | コマンド例 | タイプ |
-|------|-----------|--------|
-| コミット | `git add`, `git commit` | Push-type |
-| ブランチ | `git branch`, `git checkout`, `git switch`, `git merge` | Push-type |
-| 履歴参照 | `git log`, `git diff`, `git show`, `git blame` | Pull-type |
-| リモート送信 | `git push` | Push-type |
-| リモート取得 | `git pull`, `git fetch` | Pull-type |
-| その他 | `git stash`, `git rebase`, `git cherry-pick`, `git tag` | Push/Pull mixed |
-
-### Git Triggers
-
-| User Input | Action |
-|------------|--------|
-| 「コミットして」「pushして」 | `/deploy` スキル経由で実行 |
-| 「PRを作って」「ブランチを切って」 | `/deploy` スキル経由で実行 |
-| 「git log見せて」「差分を見せて」 | `/deploy` スキル経由で実行 |
-| 「履歴を調べて」「blame して」 | `/deploy` スキル経由で実行 |
-
-## Linear ステータス遷移
-
-**Linear への書き込み（コメント投稿・ステータス変更）は `/orchestrate` が一元的に行う。**
-`/startproject` `/team-implement` `/team-review` `/deploy` は投稿本文を OUTPUT で返すだけで、
-自分では Linear に書き込まない（allowed-tools からも Linear 書き込み系ツールを外してある）。
-
-| タイミング | ステータス変更 | 実行者 |
-|----------|--------------|--------|
-| STEP 4-1（実装開始時） | → "In Progress" | `/orchestrate` |
-| STEP 6-3（デプロイ完了後） | → "In Review" | `/orchestrate` |
+`origin` のリモート URL で判定し、GitLab（セルフホスト含む）は `glab`、GitHub は `gh` を使う。GitHub MCP は不安定なため使わない。
 
 ## GitHub / Linear MCP Operations
-
-### `context: fork` スキル内
-
-`/team-implement`, `/team-review`, `/deploy` はスキル内で git コマンドを直接実行する。
-Linear MCP の書き込みは行わず、`/orchestrate` が代行する（「Linear ステータス遷移」参照）。
 
 ### アドホック操作
 
@@ -367,14 +227,3 @@ opencode run --agent plan -m github-copilot/gpt-5.6-sol "{same question}"
 → バージョン番号など「現在の事実」は firecrawl の結果を正とする
 ```
 
----
-
-## Adding New Routes
-
-To add a new tool routing rule:
-
-1. Add entry to the **Routing Table** above
-2. Define **Scope** (what operations are covered)
-3. Define **How to Route** (subagent prompt template)
-4. Define **Trigger Detection** (user input patterns)
-5. Note any **Exceptions** (when Claude handles directly)

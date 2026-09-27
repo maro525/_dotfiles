@@ -83,13 +83,18 @@ in the wild: `done`, `completed`, `in-review`, `in_review`, `in review`,
 `implemented`, `pr-open`, `deployed`, `planning`, `in-progress`, and so on,
 including bold/backtick wrapping and trailing commentary like
 `done (PR #24 In Review)`. This covers 98.8% of real values; anything else is
-treated as no signal rather than guessed at.
+treated as no signal rather than guessed at. `in-review` / `pr-open` mean the
+PR is open and awaiting merge, so they map to **deploy** (where `/orchestrate`
+leaves a finished task); the review phase itself is `reviewing`.
 
-**Evidence** — which sections hold real content (template comments, `N/A`,
-`未着手` and similar placeholders do not count), plus which Decision Log entry
-prefixes are present: `- [startproject]`, `- [team-implement]`,
-`- [team-review]`, `- [deploy]`. Those prefixes are matched only at the start of
-a list item; a `[deploy]` mentioned in prose is not evidence that deploy ran.
+**Evidence** — which process sections hold real content (template comments,
+`N/A`, `未着手` and similar placeholders do not count): `## startproject`,
+`## team-implement`, `## team-review`, `## deploy`. Files written before the
+current layout are still read: the old section names (`## Brief`,
+`## Implementation Notes`, `## Review`) count for the same phases, and so do
+their Decision Log entry prefixes (`- [startproject]`, `- [team-implement]`,
+`- [team-review]`, `- [deploy]`). Those prefixes are matched only at the start
+of a list item; a `[deploy]` mentioned in prose is not evidence that deploy ran.
 
 **The column** is whichever is further along, with one asymmetry: only
 `declared` may assert `done`. Completion is a claim about intent, and no amount
