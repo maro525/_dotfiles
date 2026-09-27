@@ -9,3 +9,11 @@ bash/.bashrc.local
 cline/secrets.json
 cline/providers.json
 cline/config.json
+
+# Python bytecode and tool caches
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
