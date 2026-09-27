@@ -1,16 +1,14 @@
 #!/usr/bin/env python3
 """
-UserPromptSubmit hook: Unified intent router for skills and agents.
+UserPromptSubmit hook: route user prompts to a skill or agent.
 
-Routes user prompts to the appropriate skill or agent:
-1. If an explicit skill command (/orchestrate, /startproject, etc.) is present, do nothing.
-2. Detect skill intent and route to /orchestrate (main entry point).
-3. Detect agent intent (OpenCode, firecrawl MCP, Explore subagent).
-4. Exclude lightweight tasks (questions, single-file edits, explanations).
+Priority: explicit command (/orchestrate etc.) > skill intent (-> /orchestrate)
+> agent intent (OpenCode / firecrawl MCP / Explore) > none.
+Lightweight-task exclusion is currently disabled: is_lightweight_task() always
+returns False when a skill trigger matched, so any skill trigger yields a
+suggestion (the question / single-file patterns below are dead code for now).
 
-Output: additionalContext suggesting the best action (soft recommendation, not forced).
-
-Priority: explicit command > skill intent > agent intent > none
+Output: additionalContext with a soft recommendation.
 """
 
 import json
@@ -383,27 +381,24 @@ SKILL_DESCRIPTIONS = {
     # startproject / team-implement / team-review → /orchestrate に統一
     "startproject": (
         "[Skill Routing] Detected project/feature start intent (trigger: '{trigger}'). "
-        "Use `/orchestrate` to run the full workflow automatically "
-        "(plan → implement → review → deploy). "
+        "Use `/orchestrate` for the full workflow (plan → implement → review → deploy). "
         "Run: /orchestrate {prompt_summary}"
     ),
     "team-implement": (
         "[Skill Routing] Detected implementation intent (trigger: '{trigger}'). "
-        "Use `/orchestrate` for the full workflow "
-        "(phase commands such as /team-implement only work when called by /orchestrate). "
+        "Use `/orchestrate` (/team-implement only works when called by it). "
         "Run: /orchestrate {prompt_summary}"
     ),
     "team-review": (
         "[Skill Routing] Detected review intent (trigger: '{trigger}'). "
-        "Use `/orchestrate` for the full workflow "
-        "(phase commands such as /team-review only work when called by /orchestrate). "
+        "Use `/orchestrate` (/team-review only works when called by it). "
         "Run: /orchestrate {prompt_summary}"
     ),
     # deploy は git 単体操作もあるので /deploy を残しつつ /orchestrate も案内
     "deploy": (
         "[Skill Routing] Detected git/deploy intent (trigger: '{trigger}'). "
-        "For git write operations only (commit, push, PR, branch, merge, etc.): /deploy\n"
-        "For full project workflow: /orchestrate {prompt_summary}"
+        "Git write operation only (commit, push, PR, branch, merge, etc.): /deploy\n"
+        "Full project workflow: /orchestrate {prompt_summary}"
     ),
 }
 
@@ -448,9 +443,8 @@ def route_prompt(prompt: str) -> dict | None:
             "hookSpecificOutput": {
                 "hookEventName": "UserPromptSubmit",
                 "additionalContext": (
-                    f"[Agent Routing] Detected '{trigger}' - consider using "
-                    "OpenCode CLI for deep reasoning. "
-                    "Use subagent for context isolation."
+                    f"[Agent Routing] Detected '{trigger}' - consider OpenCode CLI "
+                    "for deep reasoning, via a subagent for context isolation."
                 ),
             }
         }
@@ -460,14 +454,11 @@ def route_prompt(prompt: str) -> dict | None:
                 "hookEventName": "UserPromptSubmit",
                 "additionalContext": (
                     f"[Agent Routing] Detected '{trigger}' - run external "
-                    "research on two tracks in parallel: firecrawl MCP "
-                    "(firecrawl_search / firecrawl_scrape) for sourced facts, "
-                    "and `opencode run --agent plan -m "
-                    "github-copilot/gpt-5.6-sol` for implementation "
-                    "know-how (keep --agent plan, no 2>/dev/null, run it "
-                    "in the background). "
-                    "Use subagents for context isolation; prefer the firecrawl "
-                    "sources when the two disagree."
+                    "research on two parallel tracks via subagents: firecrawl MCP "
+                    "(firecrawl_search / firecrawl_scrape) for sourced facts, and "
+                    "`timeout -k 1m 20m opencode run --agent plan -m github-copilot/gpt-5.6-sol` "
+                    "for implementation know-how (keep --agent plan, no 2>/dev/null, "
+                    "run in the background). Prefer firecrawl when they disagree."
                 ),
             }
         }
@@ -476,9 +467,8 @@ def route_prompt(prompt: str) -> dict | None:
             "hookSpecificOutput": {
                 "hookEventName": "UserPromptSubmit",
                 "additionalContext": (
-                    f"[Agent Routing] Detected '{trigger}' - consider using "
-                    "the Explore subagent for codebase-wide analysis. "
-                    "Use subagent for context isolation."
+                    f"[Agent Routing] Detected '{trigger}' - consider the Explore "
+                    "subagent for codebase-wide analysis (context isolation)."
                 ),
             }
         }

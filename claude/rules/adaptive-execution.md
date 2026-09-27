@@ -4,8 +4,6 @@
 
 ## Task Size Classification
 
-Claude automatically classifies tasks into 4 tiers based on hybrid criteria.
-
 ### Classification Table
 
 | Tier | Files | Complexity | Risk | External Research |
@@ -17,15 +15,9 @@ Claude automatically classifies tasks into 4 tiers based on hybrid criteria.
 
 ### Classification Logic
 
-```
-tier = max(file_tier, complexity_tier, risk_tier)
-```
-
-Evaluate all three dimensions independently. The highest tier wins.
+`tier = max(file_tier, complexity_tier, risk_tier)` — evaluate the three dimensions independently; the highest wins.
 
 ### Hard Triggers (Auto-L)
-
-Any of the following automatically escalates to L:
 
 - Database migration or schema change
 - Authentication / authorization changes
@@ -46,33 +38,33 @@ Any of the following automatically escalates to L:
 
 ## Workflow per Tier
 
-各フェーズの tier 別の体制は各 command（`startproject` / `team-implement` / `team-review`）に定義する。XS は `/orchestrate` を使わず直接実装する。
+Per-phase team structure is defined in each command (`startproject` / `team-implement` / `team-review`). XS skips `/orchestrate` and is implemented directly.
+
+Both tables below use the same invocation: `timeout -k 1m 20m opencode run --agent plan -m github-copilot/gpt-5.6-sol` (details in `$HOME/.claude/rules/tool-routing.md`). Inside `/startproject` (no Agent tool) and `context: fork` commands, run it directly; elsewhere via a subagent.
 
 ### External Research (firecrawl MCP + OpenCode)
 
-外部リサーチは firecrawl MCP（一次情報）と OpenCode `--agent plan -m github-copilot/gpt-5.6-sol`（実装知見）を並列実行する。
+firecrawl MCP (sourced facts) and OpenCode (implementation know-how) run in parallel.
 
 | Tier | Usage |
 |------|-------------|
 | **XS** | Never |
 | **S** | Never |
 | **M** | Only if task involves unknown libraries or external APIs |
-| **L** | Standard（`/startproject` 内は Agent ツールが無いため直接実行。それ以外はサブエージェント経由） |
+| **L** | Standard |
 
 ### OpenCode Design Consultation
-
-設計相談も外部リサーチと同じ呼び出し形を使う: `opencode run --agent plan -m github-copilot/gpt-5.6-sol`（詳細は `$HOME/.claude/rules/tool-routing.md`）。
 
 | Tier | OpenCode Usage |
 |------|------------|
 | **XS** | Never |
 | **S** | Only if debugging a non-obvious issue |
-| **M** | Subagent for design questions |
-| **L** | `/startproject` 内は Bash から直接実行。それ以外はサブエージェント経由 |
+| **M** | Design questions |
+| **L** | Standard |
 
 ## Escalation
 
-Tasks can escalate upward during execution (never downward).
+Tasks escalate upward during execution (never downward).
 
 ### Checkpoints
 
@@ -89,17 +81,11 @@ Tasks can escalate upward during execution (never downward).
 
 ### Escalation Behavior
 
-Escalation is **additive** — add resources for the new tier without restarting:
-
-- S → M: Add OpenCode consultation for open design questions
-- M → L: Spawn additional teammates for uncovered modules
-- Never restart completed work
-
 Within `/orchestrate`, team-implement stops and returns `ESCALATION`; orchestrate updates the tier and re-runs startproject with it. Code changed so far stays on the work branch and is continued, not redone.
 
 ## Presentation
 
-When classifying, briefly state the tier and reasoning to the user:
+State the tier and reasoning to the user when classifying:
 
 ```
 **Task Size: M (Medium)**
@@ -109,4 +95,4 @@ When classifying, briefly state the tier and reasoning to the user:
 - External research: Not needed
 ```
 
-User can override the classification if they disagree.
+User can override the classification.

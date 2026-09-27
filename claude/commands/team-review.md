@@ -12,10 +12,7 @@ allowed-tools: Read, Write, Bash, Grep, Glob, Agent, Skill, AskUserQuestion, Tod
 
 レビューフェーズを担当。
 
-**TASK_FILE への書き込みと Linear への投稿は行わない。**
-レビュー結果は OUTPUT フォーマットで呼び出し元（`/orchestrate` STEP 5）に返し、
-TASK_FILE の更新・Linear コメント投稿は呼び出し元が行う。
-TASK_FILE は Read のみ（`## startproject` / `## team-implement` の参照用）。
+**TASK_FILE への書き込みと Linear への投稿は行わない。** 結果は OUTPUT フォーマットで呼び出し元（`/orchestrate` STEP 5）に返し、TASK_FILE の更新・Linear コメント投稿は呼び出し元が行う。TASK_FILE は Read のみ。
 
 ## Input
 
@@ -28,8 +25,6 @@ $ARGUMENTS の形式: "{task description} --tier={S|M|L} --task-file={TASK_FILE}
 | `--tier` | orchestrator が判定済み |
 | `--task-file` | orchestrator が作成済みのタスクファイルパス |
 | `--linear-id` | orchestrator が確認済みの Linear タスク ID |
-
----
 
 ## 事前準備
 
@@ -46,8 +41,6 @@ $ARGUMENTS の形式: "{task description} --tier={S|M|L} --task-file={TASK_FILE}
 |---|---|---|
 | ブラウザ表示系 | UI コンポーネント・CSS・レイアウト変更を含む | ブラウザで表示確認 |
 | ロジック系 | ビジネスロジック・API・データ処理を含む | テスト実行 |
-
----
 
 ## STEP 1: コードレビュー（並列）
 
@@ -67,11 +60,11 @@ tier に応じたレビュアーを同時に起動する。**レビュー中は�
 | Simplify | 変更ファイルを読み、過剰な複雑さ・重複・再利用できる既存コードの観点で指摘する（`/simplify` はコードを書き換えるので使わない） |
 
 ### OpenCode Reviewer
-変更内容が長いのでプロンプトはファイルに落として渡す。
-呼び出し方・待ち方・失敗時の扱いは `$HOME/.claude/rules/tool-routing.md` の「OpenCode リサーチの実行」に従う。呼べなければこのレビュアーは飛ばし、結果に「OpenCode 不可: {理由}」と書く。
+
+変更内容が長いのでプロンプトはファイルに落として渡す。呼び出し方・待ち方・失敗時の扱いは `$HOME/.claude/rules/tool-routing.md` の「OpenCode リサーチの実行」に従う。呼べなければこのレビュアーは飛ばし、結果に「OpenCode 不可: {理由}」と書く。
 
 ```bash
-opencode run --agent plan -m github-copilot/gpt-5.6-sol "$(cat {prompt_file})" < /dev/null
+timeout -k 1m 20m opencode run --agent plan -m github-copilot/gpt-5.6-sol "$(cat {prompt_file})" < /dev/null
 ```
 
 プロンプトの中身:
@@ -82,31 +75,18 @@ DO NOT USE ANY TOOLS.
 {変更ファイルの内容}
 ```
 
----
-
 ## STEP 2: 統合
 
-各レビュアーの結果を受け取り統合する。
-
-- 重複する指摘は1件にまとめ、severity を引き上げる
+- 重複する指摘は 1 件にまとめ、severity を引き上げる
 - 矛盾する指摘はより厳しい方を採用
 - minor 指摘はまとめて申し送り事項へ
 
----
-
 ## STEP 3: 動作検証
 
-変更の性質に応じて実行する。両方該当する場合は両方実施。
+変更の性質に応じて実行する（両方該当なら両方）。
 
-### ブラウザ表示系 → ブラウザで確認
-
-対象ページを開いて操作し、各状態のスクリーンショットを記録する。使うツールは問わない。
-
-### ロジック系 → テスト実行
-
-プロジェクトのテストを実行し、新規実装に対応するテストがあるかも確認する。
-
----
+- **ブラウザ表示系:** 対象ページを開いて操作し、各状態のスクリーンショットを記録する。使うツールは問わない
+- **ロジック系:** プロジェクトのテストを実行し、新規実装に対応するテストがあるかも確認する
 
 ## STEP 4: 判定
 
@@ -119,9 +99,7 @@ DO NOT USE ANY TOOLS.
 | minor | 改善提案・命名・スタイル・リファクタリング推奨 | PASS（申し送りとして記録） |
 
 - **PASS** — critical / major がゼロ
-- **FAIL** — critical または major が1件以上
-
----
+- **FAIL** — critical または major が 1 件以上
 
 ## OUTPUT
 
