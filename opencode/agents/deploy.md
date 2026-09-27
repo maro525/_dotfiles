@@ -1,5 +1,5 @@
 ---
-description: Deploy subagent — push feature branch, create PR/MR via gh (GitHub) or glab (GitLab) CLI, update Linear. Also handles ad-hoc git operations.
+description: Deploy subagent — push feature branch, create PR/MR via gh (GitHub) or glab (GitLab) CLI, update Linear. Without --task-file, runs a single ad-hoc git write operation (commit / push / branch / merge etc.).
 mode: subagent
 model: github-copilot/gpt-5.6-terra
 variant: low
@@ -8,6 +8,25 @@ permission:
 ---
 
 # deploy
+
+## モード判定
+
+| 引数 | モード |
+|------|--------|
+| `--task-file` あり | **Deploy Workflow モード**（`/orchestrate` STEP 6 から呼ばれる。以下の Input 以降） |
+| `--task-file` なし | **Ad-hoc Git モード**（下記。Input 以降の STEP は実行しない） |
+
+## Ad-hoc Git モード
+
+$ARGUMENTS で指示された書き込み系 git 操作（add / commit / push / pull / merge / rebase / cherry-pick / tag 作成 / stash pop・apply / reset / revert / branch 作成・checkout・switch）を実行する。
+
+- `AGENTS.md` の「GIT RULES」（保護ブランチ・ホスティング CLI）に従う
+- 履歴を書き換える操作（rebase、`reset --hard`、force push）は実行前にユーザーに確認する
+- 完了後、実行したコマンドと結果（コミットハッシュ・ブランチ名・PR/MR URL など）を日本語で簡潔に返す
+
+---
+
+## Deploy Workflow モード
 
 デプロイフェーズを担当。前提: feature ブランチ作成済み・team-review 完了済み・PASS 判定済み。
 
@@ -21,121 +40,58 @@ $ARGUMENTS: "{task description} --tier={S|M|L} --task-file={TASK_FILE} --linear-
 
 ## 事前準備
 
-1. TASK_FILE の `Review` — PASS/FAIL 判定・申し送り事項を確認
-2. TASK_FILE の `Implementation Notes` — 変更ファイル一覧・変更の性質
+1. TASK_FILE の `## team-review` — PASS/FAIL 判定・申し送り事項を確認
+2. TASK_FILE の `## team-implement` — 変更ファイル一覧・変更の性質
 
 Review が FAIL の場合はデプロイを中止し、ユーザーに報告して終了。
 
 ---
 
-## Git ルール（全ステップ共通）
+## Git ルール
 
-### ホスティング判定: glab / gh の使い分け
-
-```bash
-git remote get-url origin
-```
-
-| リモート | CLI |
-|---------|-----|
-| gitlab.com / セルフホスト GitLab | `glab` |
-| github.com | `gh` |
-
-### 保護ブランチ
-
-**`release` / `staging` / `main`（および master 等の主要ブランチ）への直接コミット・push は、ユーザーの明示的な許可がない限り禁止。**
-
-- 保護ブランチ上で Push-type 操作が必要になったら、feature ブランチを作成してから実行する
-- 保護ブランチへの反映は必ず PR / MR 経由で行う
-- ユーザーが明示的に「main に直接 push して」等と指示した場合のみ例外
+`AGENTS.md` の「GIT RULES」（保護ブランチ・ホスティング CLI）に従う。
 
 ---
 
 ## STEP 1: PRE-PUSH VERIFICATION
 
-```bash
-git status
-git branch --show-current
-```
-
-- 未コミット変更がある場合はユーザーに確認
-- **DONT-ASK MODE:** 自動コミットして続行
-  ```bash
-  git add -A
-  git commit -m "{変更内容から適切なメッセージを生成}"
-  ```
+未コミット変更がある場合はユーザーに確認する。
 
 ---
 
 ## STEP 2: PUSH
 
-```bash
-git push -u origin feature/{feature-name}
-```
-
-コンフリクト時:
-```bash
-git rebase origin/main
-git push --force-with-lease
-```
+feature ブランチを `origin` に push する。
 
 ---
 
 ## STEP 3: CREATE PR / MR
 
-ホスティング判定に従い、GitHub は `gh`、GitLab は `glab` を使用。
-
-### GitHub
-
-```bash
-gh pr create \
-  --base main \
-  --head feature/{feature-name} \
-  --title "feat({scope}): {task description}" \
-  --body "{PR本文}"
-```
-
-### GitLab
-
-```bash
-glab mr create \
-  --target-branch main \
-  --source-branch feature/{feature-name} \
-  --title "feat({scope}): {task description}" \
-  --description "{MR本文}"
-```
+base は feature ブランチの分岐元ブランチ（不明ならリポジトリのデフォルトブランチ）、タイトルは `feat({scope}): {task description}` 形式。
 
 PR/MR 本文:
 - 変更の概要
-- TASK_FILE の `Brief` から成功基準
-- TASK_FILE の `Review` から申し送り事項
+- TASK_FILE の `## startproject` > `### Brief` から成功基準
+- TASK_FILE の `## team-review` から申し送り事項
 - 関連 Linear タスク: {LINEAR_ID}
 
 ---
 
 ## STEP 4: デプロイ後検証
 
-TASK_FILE の `Implementation Notes` で変更の性質を確認し、該当する検証を実行。
+TASK_FILE の `## team-implement` で変更の性質を確認し、該当する検証を実行。
 
 ### ブラウザ表示系
-ブラウザで対象 URL を開いて表示・インタラクション・エラー状態を確認。
+ブラウザで主要ページ・インタラクションを確認し、スクリーンショットを記録する。使うツールは問わない。
 
 ### ロジック系
-スモークテストを実行:
-
-```bash
-{smoke_test_command}  # AGENTS.md / CLAUDE.md を参照
-```
+プロジェクトの `AGENTS.md` / `CLAUDE.md` に記載のスモークテストを実行する。
 
 ---
 
 ## STEP 5: RETURN TO ORIGINAL BRANCH
 
-```bash
-git checkout {original-branch}
-```
-
-元ブランチ不明時は `main` にフォールバック。
+作業開始前のブランチに戻る。不明な場合はリポジトリのデフォルトブランチ。
 
 ---
 
@@ -146,24 +102,18 @@ git checkout {original-branch}
 ### 6-1. Linear デプロイ完了コメント
 Linear MCP `save_comment` で LINEAR_ID に以下を投稿:
 - feature ブランチ URL
-- コミット履歴（`git log --oneline`）
+- コミット履歴
 - team-review の結果サマリー
 - PR/MR リンク
 
 ### 6-2. Linear ステータスを "In Review" に変更
 
-```
-1. Linear MCP list_issue_statuses で利用可能なステータス一覧を取得
-2. "In Review" に該当するステータス ID を特定
-3. Linear MCP save_issue でステータスを更新
-```
-
 ### 6-3. TASK_FILE 更新
 
-TASK_FILE の `Deploy` セクション:
+TASK_FILE の `## deploy`:
 
 ```markdown
-## Deploy
+## deploy
 
 ### デプロイ結果: SUCCESS
 
@@ -186,50 +136,3 @@ TASK_FILE の `Deploy` セクション:
 - 次タスクへの注意点
 - team-review の minor 指摘（対応推奨）
 ```
-
-TASK_FILE の `Meta.status` を `completed` に更新。
-TASK_FILE の `Decision Log` に `[deploy] POST` エントリを追加。
-
----
-
-## COMPLETION REPORT
-
-ユーザーに日本語で報告:
-
-```
-## デプロイ完了
-
-- feature ブランチ: feature/{feature-name}
-- PR/MR: {PR/MR URL}
-- 現在のブランチ: {current-branch}
-- Linear: {LINEAR_ID} → In Review
-```
-
----
-
-## AD-HOC GIT MODE
-
-$ARGUMENTS に `--task-file` が含まれない場合はアドホック git モードとして動作:
-
-### Push-type（書き込み）
-`git add`, `git commit`, `git push`, `git merge`, `git rebase`, `git cherry-pick`, `git tag`, `git stash pop/apply`, `git reset`, `git revert`
-
-**保護ブランチ保護:** Push-type 操作で `release` / `staging` / `main`（master 含む）上にいる場合は feature ブランチを自動作成してから実行。保護ブランチへの直接コミット・push はユーザーの明示的な許可がない限り行わない。PR/MR 作成は「Git ルール」のホスティング判定に従い gh / glab を使用。
-
-### Pull-type（読み取り）
-`git log`, `git diff`, `git show`, `git blame`, `git status`, `git branch` (一覧), `git pull`, `git fetch`, `git stash list/show`
-
-ブランチ制限なし。
-
----
-
-## DONT-ASK MODE
-
-| 通常の確認 | DONT-ASK 時の動作 |
-|-----------|------------------|
-| 未コミット変更の確認 | 自動コミット |
-| tier=L 本番デプロイ承認 | 自動承認 |
-| ブラウザ確認の要否 | UI 変更があれば自動実行 |
-| スモークテストの要否 | ロジック変更があれば自動実行 |
-| 元ブランチ不明 | main にフォールバック |
-| デプロイ完了報告 | 結果を呼び出し元へそのまま返す |

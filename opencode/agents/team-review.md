@@ -1,5 +1,5 @@
 ---
-description: Review subagent — parallel reviewers (Quality / Logic / Security / Simplify), browser/test verification. Outputs PASS / FAIL to TASK_FILE.
+description: Review subagent — parallel reviewers by tier (S: self / M: +Second Opinion, Security / L: +Simplify), browser/test verification. Outputs PASS / FAIL to TASK_FILE.
 mode: subagent
 model: github-copilot/gpt-5.6-sol
 variant: xhigh
@@ -21,10 +21,10 @@ $ARGUMENTS: "{task description} --tier={S|M|L} --task-file={TASK_FILE} --linear-
 
 ## 事前準備
 
-1. TASK_FILE の `Brief` — スコープ・成功基準
-2. TASK_FILE の `Design` — 設計方針・意図
-3. TASK_FILE の `Implementation Notes` — 実装サマリー・申し送り
-4. 変更ファイル一覧を `git diff` / Read で確認
+1. TASK_FILE の `## startproject` > `### Brief` — スコープ・成功基準
+2. TASK_FILE の `## startproject` > `### Design` — 設計方針・意図
+3. TASK_FILE の `## team-implement` — 実装サマリー・申し送り
+4. 変更ファイル一覧
 
 **[MUST]** Linear MCP `save_comment` でレビュー開始コメント投稿（ステータス → In Progress）。
 
@@ -32,46 +32,33 @@ $ARGUMENTS: "{task description} --tier={S|M|L} --task-file={TASK_FILE} --linear-
 
 | 性質 | 判定基準 | 検証方法 |
 |------|---------|---------|
-| ブラウザ表示系 | UI / CSS / レイアウト変更 | ブラウザ確認（manual or mcp） |
+| ブラウザ表示系 | UI / CSS / レイアウト変更 | ブラウザで表示確認 |
 | ロジック系 | ビジネスロジック・API・データ処理 | テスト実行 |
 
 ---
 
 ## STEP 1: コードレビュー（並列）
 
-**tier ごとのレビュアー構成:**
+tier に応じたレビュアーを同時に起動する。
 
 | tier | レビュアー |
 |------|----------|
-| S (mode=self-review) | Quality Reviewer のみ |
-| M | Quality + Security |
-| L | Quality + Logic + Security + Simplify |
+| S（`--mode=self-review`） | Primary |
+| M | Primary / Second Opinion / Security |
+| L | Primary / Second Opinion / Security / Simplify |
 
-### Quality Reviewer
-変更ファイルを Read してレビュー。
-観点: 可読性・命名・重複・SOLID原則。
-
-### Logic Reviewer
-観点: バグ・エッジケース・エラーハンドリング。`task` tool で並列 subagent として起動:
-
-- prompt: "以下のコード変更を Logic 観点（バグ・エッジケース・エラーハンドリング）でレビュー: {変更ファイル内容}"
-- 期待: severity 付きの指摘リストを返す
-
-### Security Reviewer
-`.claude/rules/security.md` を Read し、記載ルールに従って変更ファイルをチェック。
-
-観点（security.md に従う）:
-- 認証・認可の抜け
-- 入力バリデーション・サニタイズ
-- 機密情報のハードコード
-- SQL インジェクション・XSS 等の脆弱性
-
-### Simplify Reviewer
-観点: 過剰な複雑さ・不要な抽象化・デッドコード・リファクタ提案。
+| レビュアー | 方法 |
+|-----------|------|
+| Primary | 変更ファイルを自分で直接読み、Quality / Logic の観点でレビュー |
+| Second Opinion | `task` tool で subagent を起動し、観点は Primary と同じ（別コンテキストでの独立したセカンドオピニオン）。severity 付きの指摘リストを返させる |
+| Security | `$HOME/.claude/rules/security.md` のルールを変更コードに照合し、違反・懸念を severity 付きで列挙 |
+| Simplify | 過剰な複雑さ・不要な抽象化・デッドコードを検出し、簡略化を提案 |
 
 ---
 
-## STEP 2: Lead による統合
+## STEP 2: 統合
+
+各レビュアーの結果を受け取り統合する。
 
 - 重複指摘は1件にまとめ severity を引き上げ
 - 矛盾する指摘はより厳しい方を採用
@@ -81,17 +68,13 @@ $ARGUMENTS: "{task description} --tier={S|M|L} --task-file={TASK_FILE} --linear-
 
 ## STEP 3: 動作検証
 
-### ブラウザ表示系 → ブラウザ確認
-- 対象ページをユーザーに開いてもらうか、Playwright MCP があれば自動化
-- レイアウト・インタラクション・エラー状態を確認
+変更の性質に応じて実行する。両方該当する場合は両方実施。
+
+### ブラウザ表示系 → ブラウザで確認
+対象ページを開いて操作し、各状態のスクリーンショットを記録する。使うツールは問わない。
 
 ### ロジック系 → テスト実行
-プロジェクトのテストコマンドを `AGENTS.md` / `package.json` / `pyproject.toml` から確認して実行。
-
-観点:
-- 全テスト通過か
-- 新規実装に対応するテストが存在するか
-- カバレッジに明らかな欠落がないか
+プロジェクトのテストを実行し、新規実装に対応するテストがあるかも確認する。
 
 ---
 
@@ -110,19 +93,19 @@ $ARGUMENTS: "{task description} --tier={S|M|L} --task-file={TASK_FILE} --linear-
 
 ## OUTPUT
 
-TASK_FILE の `Review` セクション:
+TASK_FILE の `## team-review`:
 
 ```markdown
-## Review
+## team-review
 
 ### 判定: PASS / FAIL
 
 ### コードレビュー統合結果
 
-#### Quality Reviewer
+#### Primary Reviewer
 - [severity] 指摘内容
 
-#### Logic Reviewer
+#### Second Opinion Reviewer
 - [severity] 指摘内容
 
 #### Security Reviewer
@@ -152,14 +135,4 @@ TASK_FILE の `Review` セクション:
 ```
 
 **[MUST]** Linear MCP `save_comment` で PASS/FAIL + サマリー投稿。
-**[MUST]** TASK_FILE の `Decision Log` に `[team-review] POST` エントリ追加。
 
----
-
-## DONT-ASK MODE
-
-| 通常の確認 | DONT-ASK 時の動作 |
-|-----------|------------------|
-| ブラウザ確認の要否 | UI 関連変更があれば自動実行 |
-| テスト実行の要否 | ロジック変更があれば自動実行 |
-| PASS/FAIL 報告 | 判定結果を呼び出し元へそのまま返す |

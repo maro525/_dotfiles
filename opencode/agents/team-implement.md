@@ -1,5 +1,5 @@
 ---
-description: Implementation subagent — reads design, implements code, writes to TASK_FILE.
+description: Implementation subagent — reads design and plan, implements code, writes the team-implement section of TASK_FILE.
 mode: subagent
 model: github-copilot/gpt-5.6-terra
 variant: xhigh
@@ -9,7 +9,7 @@ permission:
 
 # team-implement
 
-実装フェーズを担当。TASK_FILE の Design に沿って実装する。
+実装フェーズを担当。TASK_FILE の `## startproject` に沿って実装する。
 
 ## Input
 
@@ -23,10 +23,9 @@ $ARGUMENTS: "{task description} --tier={S|M|L} --task-file={TASK_FILE} --linear-
 
 実装開始前に必ず以下を読む。
 
-1. TASK_FILE の `Brief` — スコープ・成功基準
-2. TASK_FILE の `Design`（tier=M,L）— 設計方針・アーキ決定
-3. TASK_FILE の `Decision Log` — これまでの意思決定
-4. `todowrite` タスクリスト — startproject が作成した実装タスク
+1. TASK_FILE の `## startproject` > `### Brief` — スコープ・成功基準
+2. TASK_FILE の `## startproject` > `### Design` — 設計方針とその理由
+3. TASK_FILE の `## startproject` > `### Plan` — 実装タスクリスト
 
 **[MUST]** Linear MCP `save_comment` で LINEAR_ID に実装開始コメントを投稿（ステータス → In Progress）。
 
@@ -34,56 +33,35 @@ $ARGUMENTS: "{task description} --tier={S|M|L} --task-file={TASK_FILE} --linear-
 
 ## IMPLEMENTATION
 
-### tier=S
-直接実装。
+feature ブランチで作業し、テストを先に書く（TDD）。tier によって体制を切り替える。
 
-- feature ブランチを作成して作業
-- TDD（テスト先行）
-- 完了後 TASK_FILE の `Implementation Notes` に記録
-
-### tier=M
-直接実装 or 1-2 subagent に委譲。
-
-- feature ブランチを作成
-- モジュールが独立している場合は subagent に並列実装させる
-- 各 subagent の成果を Lead がレビュー・統合
-
-### tier=L
-フルチームでモジュール単位のオーナーシップ制。
-
-- feature ブランチを作成
-- Lead がモジュールを分割し、各 subagent にアサイン
-- 各 subagent は担当モジュールの実装・テストまで完結
-- subagent 間の依存は Lead が調整
+| tier | 体制 |
+|------|------|
+| S | 自分で実装する |
+| M | 自分で実装するか、独立したモジュールを 1-2 subagent（`task` tool）に並列で任せて統合する |
+| L | モジュール単位で分割して subagent に割り当てる（実装・テストまで担当モジュール内で完結）。依存の調整と統合は自分が行う |
 
 ---
 
-## エスカレーション確認
+## 実装中のエスカレーション確認
 
-| チェックポイント | 確認内容 |
-|----------------|---------|
-| 実装 30-40% 時点 | スコープが広がっていないか |
-| 新依存追加時 | Hard Trigger に該当しないか |
-| 未解決設計問題 | tier 引き上げが必要か |
-
-エスカレーションが必要な場合はユーザーに報告して承認を得る。
+`AGENTS.md` の「ADAPTIVE EXECUTION」のエスカレーションに従って tier を再評価する。
+エスカレーションが必要な場合はユーザーに報告し、承認を得てから続行する。
 
 ---
 
 ## 完了条件
 
-- [ ] todowrite のタスクリストがすべて完了
-- [ ] テストがすべて通過
-- [ ] TASK_FILE の `Implementation Notes` 記入済み
+Plan のタスクがすべて完了し、テストがすべて通過したら OUTPUT を書き込む。
 
 ---
 
 ## OUTPUT
 
-TASK_FILE の `Implementation Notes`:
+TASK_FILE の `## team-implement`:
 
 ```markdown
-## Implementation Notes
+## team-implement
 
 ### 実装サマリー
 - 実装したモジュール・ファイル一覧
@@ -101,14 +79,4 @@ TASK_FILE の `Implementation Notes`:
 ```
 
 **[MUST]** Linear MCP `save_comment` で LINEAR_ID に実装完了コメント投稿。
-**[MUST]** TASK_FILE の `Decision Log` に `[team-implement] POST` エントリ追加。
 
----
-
-## DONT-ASK MODE
-
-| 通常の確認 | DONT-ASK 時の動作 |
-|-----------|------------------|
-| 設計上の判断 | Design セクションから推定して続行 |
-| エスカレーション承認 | 自動で tier を引き上げて続行 |
-| 実装完了確認 | 完了条件を満たしたら自動で呼び出し元へ返す |
