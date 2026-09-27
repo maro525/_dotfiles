@@ -45,18 +45,19 @@ def make_task(
         ("in-progress", "implementing"),
         ("in_progress", "implementing"),
         ("implementing", "implementing"),
-        ("in-review", "review"),
-        ("in_review", "review"),
-        ("in review", "review"),
+        ("in-review", "deploy"),
+        ("in_review", "deploy"),
+        ("in review", "deploy"),
+        ("reviewing", "review"),
         ("review", "review"),
         ("implemented", "review"),
-        ("pr-open", "review"),
+        ("pr-open", "deploy"),
         ("deployed", "deploy"),
         ("merging_and_deploying", "deploy"),
         ("**done**", "done"),
         ("`done`", "done"),
         ("done (PR open)", "done"),
-        ("in-review (PR #87)", "review"),
+        ("in-review (PR #87)", "deploy"),
         ("completed (deployed 2026-07-23)", "done"),
         ("active", "implementing"),
         ("reviewed", "review"),
@@ -121,7 +122,7 @@ def test_stale_status_detected_when_evidence_is_ahead() -> None:
 
 
 def test_declared_wins_when_ahead_of_evidence() -> None:
-    card = classify(make_task(status="in-review", sections=frozenset({"brief"})))
+    card = classify(make_task(status="reviewing", sections=frozenset({"brief"})))
     assert card.phase == "review"
     assert card.stale_status is False
 
@@ -158,10 +159,12 @@ def test_unknown_when_no_signal_at_all() -> None:
         # token is the claim; the parenthetical is not. All of these occur in
         # the real corpus and used to classify as `deploy`.
         ("implemented（deploy 未実行）", "review"),
-        ("in review (PR open, NOT merged)", "review"),
+        # `in review` / `pr-open` mean the PR is open and awaiting merge, which
+        # is the deploy column -- /orchestrate ends a task in that state.
+        ("in review (PR open, NOT merged)", "deploy"),
         ("review passed (deploy 待ち)", "review"),
-        ("in_review (deploy 完了・PR #47 オープン / 自動 merge なし)", "review"),
-        ("pr-open (merge / modal deploy pending approval)", "review"),
+        ("in_review (deploy 完了・PR #47 オープン / 自動 merge なし)", "deploy"),
+        ("pr-open (merge / modal deploy pending approval)", "deploy"),
         ("implemented (awaiting review/deploy)", "review"),
         ("implemented — PR 作成済み / release へのマージと本番デプロイは未実施", "review"),
         # The head still wins when it is the furthest-along token.

@@ -28,11 +28,19 @@ from .model import PHASE_RANK, Card, ParsedTask, Phase
 #: specific states must precede the generic ones they contain.
 _STATUS_RULES: tuple[tuple[re.Pattern[str], Phase], ...] = (
     (re.compile(r"\b(?:done|complete|completed|closed|shipped|finished)\b"), "done"),
-    (re.compile(r"\b(?:deploy|deployed|deploying|merged|merging|released)\b"), "deploy"),
+    # `in-review` / `pr-open` mean the PR is open and awaiting merge -- the
+    # state /orchestrate leaves a task in -- so they belong to deploy, not to
+    # the review phase (`reviewing`).
     (
         re.compile(
-            r"\b(?:in[-_ ]?review|reviewing|reviewed|review|pr[-_ ]?open|"
-            r"awaiting[-_ ]?review|ready[-_ ]?for[-_ ]?review)\b"
+            r"\b(?:deploy|deployed|deploying|merged|merging|released|"
+            r"in[-_ ]?review|pr[-_ ]?open)\b"
+        ),
+        "deploy",
+    ),
+    (
+        re.compile(
+            r"\b(?:reviewing|reviewed|review|awaiting[-_ ]?review|ready[-_ ]?for[-_ ]?review)\b"
         ),
         "review",
     ),

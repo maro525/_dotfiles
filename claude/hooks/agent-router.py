@@ -389,13 +389,15 @@ SKILL_DESCRIPTIONS = {
     ),
     "team-implement": (
         "[Skill Routing] Detected implementation intent (trigger: '{trigger}'). "
-        "If starting fresh, use `/orchestrate` for the full workflow. "
-        "To resume implementation only: /team-implement"
+        "Use `/orchestrate` for the full workflow "
+        "(phase commands such as /team-implement only work when called by /orchestrate). "
+        "Run: /orchestrate {prompt_summary}"
     ),
     "team-review": (
         "[Skill Routing] Detected review intent (trigger: '{trigger}'). "
-        "If starting fresh, use `/orchestrate` for the full workflow. "
-        "To run review only: /team-review"
+        "Use `/orchestrate` for the full workflow "
+        "(phase commands such as /team-review only work when called by /orchestrate). "
+        "Run: /orchestrate {prompt_summary}"
     ),
     # deploy は git 単体操作もあるので /deploy を残しつつ /orchestrate も案内
     "deploy": (

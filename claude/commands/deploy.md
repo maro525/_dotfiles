@@ -29,7 +29,7 @@ $ARGUMENTS で指示された書き込み系 git 操作（`$HOME/.claude/rules/t
 
 ## Deploy Workflow モード
 
-push と PR / MR 作成を担当する（動作検証は team-review で済んでいるので行わない）。
+コミット・push・PR / MR 作成を担当する（動作検証は team-review で済んでいるので行わない）。
 
 **TASK_FILE への書き込みと Linear への投稿・ステータス変更は行わない。**
 結果は OUTPUT フォーマットで呼び出し元（`/orchestrate` STEP 6）に返し、
@@ -70,9 +70,9 @@ Review が FAIL の場合は PR を作らずに中止し、ユーザーに報告
 
 ---
 
-## STEP 1: PRE-PUSH VERIFICATION
+## STEP 1: COMMIT
 
-未コミット変更がある場合はユーザーに確認する。
+作業ブランチ上の未コミット変更（team-implement の実装。レビュー通過済み）をコミットする。メッセージは `## team-implement` の内容から作る。
 
 ---
 

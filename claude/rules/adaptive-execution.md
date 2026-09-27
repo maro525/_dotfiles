@@ -95,6 +95,8 @@ Escalation is **additive** — add resources for the new tier without restarting
 - M → L: Spawn additional teammates for uncovered modules
 - Never restart completed work
 
+Within `/orchestrate`, team-implement stops and returns `ESCALATION`; orchestrate updates the tier and re-runs startproject with it. Code changed so far stays on the work branch and is continued, not redone.
+
 ## Presentation
 
 When classifying, briefly state the tier and reasoning to the user:

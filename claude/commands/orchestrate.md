@@ -30,13 +30,14 @@ $ARGUMENTS の形式: "{task description}"
 - 質問が必要な場合は質問する。回答を受け取ったら止まらず続行する
 - 追加の指示がない限り STEP 7 まで完走する
 - **[MUST]** の付いたステップは、どの tier でもスキップしない
+- Linear への投稿・ステータス変更に失敗したら、黙って飛ばさずユーザーに報告する
 
-**原則として止まるのは以下の Gate のみ。** ただし各 command が途中でユーザーに確認を求めた場合（tier のエスカレーション承認など）は、それに従う。
+**原則として止まるのは以下の Gate のみ。** ただし各 command が途中でユーザーに確認を求めた場合（startproject の要件ヒアリングなど）は、それに従う。
 
 | Gate | タイミング | 動作 |
 |---|---|---|
 | Gate 1 | startproject の計画提示後 | ユーザー承認を待つ |
-| Gate 3 | team-review の FAIL 時 | ユーザーに報告し判断を待つ |
+| Gate 2 | team-review の FAIL 時 | ユーザーに報告し判断を待つ |
 
 ## Git ルール
 
@@ -149,7 +150,6 @@ startproject 内で質問が発生した場合はユーザーが回答する。
 ### 3-3. **[MUST]** Linear にコメントを投稿する
 
 `mcp__linear-server__save_comment` で LINEAR_ID に `LINEAR_COMMENT` の本文を投稿する。
-投稿できなかった場合はユーザーに報告する（無言でスキップしない）。
 
 ### 3-4. Gate 1
 
@@ -165,7 +165,7 @@ startproject が自己判断して発動する（詳細は startproject.md 参�
 
 **完了次第即 STEP 5 へ進む。**
 
-開始時に TASK_FILE の `status` を `implementing` に、Linear のステータスを "In Progress" に変更する（変更できなかった場合はユーザーに報告する）。
+開始時に TASK_FILE の `status` を `implementing` に、Linear のステータスを "In Progress" に変更する。
 
 ### 4-1. 実行
 
@@ -174,7 +174,7 @@ startproject が自己判断して発動する（詳細は startproject.md 参�
 ```
 
 team-implement はコードと git 操作のみ行い、**TASK_FILE への書き込みと Linear 投稿は行わない**。
-結果を OUTPUT フォーマット（`IMPLEMENTATION_NOTES` / `LINEAR_COMMENT` / `BRANCH`）で返してくる。
+結果を OUTPUT フォーマット（`IMPLEMENTATION_NOTES` / `LINEAR_COMMENT` / `BRANCH` / `ESCALATION`）で返してくる。
 
 ### 4-2. **[MUST]** 返却内容を書き込む
 
@@ -186,11 +186,18 @@ team-implement はコードと git 操作のみ行い、**TASK_FILE への書き
 ### 4-3. **[MUST]** Linear にコメントを投稿する
 
 `mcp__linear-server__save_comment` で LINEAR_ID に `LINEAR_COMMENT` の本文を投稿する。
-投稿できなかった場合はユーザーに報告する（無言でスキップしない）。
 
-### Gate 2（内部確認）
+### 4-4. エスカレーション
 
-TASK_FILE の `## team-implement` が 4-2 で埋まっていることを確認してから STEP 5 へ進む。
+返却に `ESCALATION` がある場合（team-implement が tier の引き上げで中断した）:
+
+1. ユーザーに新しい tier と理由を報告する
+2. `tier` 変数と `## Meta` の `tier:` を更新し、`status` を `planning` に戻す
+3. 新しい tier で STEP 3 からやり直す。startproject の返却で `## startproject` を上書きする。作業ブランチ上の変更はそのまま引き継ぐ
+
+### 4-5. 完了確認
+
+`ESCALATION` がなく、TASK_FILE の `## team-implement` が 4-2 で埋まっていることを確認してから STEP 5 へ進む。
 
 ---
 
@@ -202,8 +209,6 @@ TASK_FILE の `## team-implement` が 4-2 で埋まっていることを確認�
 /team-review "{task description} --tier={tier} --task-file={TASK_FILE} --linear-id={LINEAR_ID}"
 ```
 
-tier=S の場合は `--mode=self-review` を付ける。
-
 team-review は **TASK_FILE への書き込みと Linear 投稿を行わない**。
 結果を OUTPUT フォーマット（`VERDICT` / `REVIEW` / `LINEAR_COMMENT`）で返してくる。
 
@@ -213,13 +218,13 @@ team-review は **TASK_FILE への書き込みと Linear 投稿を行わない**
 |---|---|
 | `REVIEW` | TASK_FILE の `## team-review` に `### {n}回目` として追記 |
 
-**FAIL の場合も必ず書き込む**（差し戻し履歴を残すため）。Gate 3 で STEP 4 に戻ったら、次の実装・レビューは n+1 回目として追記する（上書きしない）。
+**FAIL の場合も必ず書き込む**（差し戻し履歴を残すため）。Gate 2 で STEP 4 に戻ったら、次の実装・レビューは n+1 回目として追記する（上書きしない）。
 
 ### 5-3. **[MUST]** Linear にコメントを投稿する
 
 `mcp__linear-server__save_comment` で LINEAR_ID に `LINEAR_COMMENT` の本文を投稿する。
 
-### 5-4. Gate 3
+### 5-4. Gate 2
 
 返却の `VERDICT` で判別する。
 
@@ -238,7 +243,7 @@ team-review は **TASK_FILE への書き込みと Linear 投稿を行わない**
 /deploy "{task description} --tier={tier} --task-file={TASK_FILE} --linear-id={LINEAR_ID}"
 ```
 
-deploy は push と PR・MR 作成のみ行い、**TASK_FILE への書き込みと Linear 操作は行わない**。
+deploy はコミット・push・PR・MR 作成のみ行い、**TASK_FILE への書き込みと Linear 操作は行わない**。
 結果を OUTPUT フォーマット（`DEPLOY` / `LINEAR_COMMENT` / `LINEAR_STATUS`）で返してくる。
 
 ### 6-2. **[MUST]** 返却内容を書き込む
@@ -271,8 +276,6 @@ deploy は push と PR・MR 作成のみ行い、**TASK_FILE への書き込み�
 - deploy: ...
 ```
 
-TASK_FILE の `status` を `done` に更新する。
-
 ---
 
 ## 状態管理
@@ -289,7 +292,7 @@ orchestrator は以下を変数として保持し、全 command に引数で渡�
 
 ### TASK_FILE の `status`
 
-各 STEP の開始時に `## Meta` の `status` を更新する（Gate 3 で STEP 4 に戻った場合も `implementing` に戻す）。
+各 STEP の開始時に `## Meta` の `status` を更新する（Gate 2 で STEP 4 に戻った場合も `implementing` に戻す）。`done` には orchestrator はしない。PR がマージされた後に人間が変更する。
 
 | タイミング | status |
 |---|---|
@@ -297,4 +300,4 @@ orchestrator は以下を変数として保持し、全 command に引数で渡�
 | STEP 4 開始 | `implementing` |
 | STEP 5 開始 | `reviewing` |
 | STEP 6 開始 | `deploying` |
-| STEP 7 | `done` |
+| STEP 7 | `in-review`（PR を出してマージ待ち） |

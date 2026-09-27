@@ -57,13 +57,14 @@ feature ブランチで作業し（TASK_FILE の `## Meta` に `branch:` があ�
 ## 実装中のエスカレーション確認
 
 `$HOME/.claude/rules/adaptive-execution.md` の Escalation に従って tier を再評価する。
-エスカレーションが必要な場合はユーザーに報告し、承認を得てから続行する。
+引き上げが必要と判断したら**実装を中断**し、OUTPUT の `ESCALATION` に新しい tier と理由を書いて返す。
+それまでの変更は作業ブランチに残したままにする。tier の更新と計画のやり直しは orchestrate が行う。
 
 ---
 
 ## 完了条件
 
-Plan のタスクがすべて完了し、テストがすべて通過したら OUTPUT を返す。
+Plan のタスクがすべて完了し、テストがすべて通過したら OUTPUT を返す。変更はコミットしない（レビュー通過後に deploy がコミットする）。
 
 ---
 
@@ -94,4 +95,7 @@ Plan のタスクがすべて完了し、テストがすべて通過したら OU
 
 ### BRANCH
 feature/{feature-name}
+
+### ESCALATION
+（中断した場合のみ）{新しい tier}: {理由}
 ```

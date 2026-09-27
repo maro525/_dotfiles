@@ -83,7 +83,9 @@ in the wild: `done`, `completed`, `in-review`, `in_review`, `in review`,
 `implemented`, `pr-open`, `deployed`, `planning`, `in-progress`, and so on,
 including bold/backtick wrapping and trailing commentary like
 `done (PR #24 In Review)`. This covers 98.8% of real values; anything else is
-treated as no signal rather than guessed at.
+treated as no signal rather than guessed at. `in-review` / `pr-open` mean the
+PR is open and awaiting merge, so they map to **deploy** (where `/orchestrate`
+leaves a finished task); the review phase itself is `reviewing`.
 
 **Evidence** — which process sections hold real content (template comments,
 `N/A`, `未着手` and similar placeholders do not count): `## startproject`,

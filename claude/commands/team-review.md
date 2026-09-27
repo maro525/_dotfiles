@@ -20,7 +20,7 @@ TASK_FILE は Read のみ（`## startproject` / `## team-implement` の参照用
 ## Input
 
 ```
-$ARGUMENTS の形式: "{task description} --tier={S|M|L} --task-file={TASK_FILE} --linear-id={LINEAR_ID} [--mode=self-review]"
+$ARGUMENTS の形式: "{task description} --tier={S|M|L} --task-file={TASK_FILE} --linear-id={LINEAR_ID}"
 ```
 
 | 引数 | 説明 |
@@ -28,7 +28,6 @@ $ARGUMENTS の形式: "{task description} --tier={S|M|L} --task-file={TASK_FILE}
 | `--tier` | orchestrator が判定済み |
 | `--task-file` | orchestrator が作成済みのタスクファイルパス |
 | `--linear-id` | orchestrator が確認済みの Linear タスク ID |
-| `--mode=self-review` | tier=S 時に orchestrator が付与。Claude 単独レビュー |
 
 ---
 
@@ -39,7 +38,7 @@ $ARGUMENTS の形式: "{task description} --tier={S|M|L} --task-file={TASK_FILE}
 1. TASK_FILE の `## startproject` > `### Brief` — スコープ・成功基準
 2. TASK_FILE の `## startproject` > `### Design` — 設計方針・意図
 3. TASK_FILE の `## team-implement` の最新回 — 実装サマリー・申し送り事項（差し戻し後は前回の `## team-review` の指摘が直っているかも確認する）
-4. 変更ファイル一覧
+4. 変更ファイル一覧（作業ブランチ上の未コミット変更。team-implement はコミットしない）
 
 変更の性質を判定する（複数該当可）:
 
@@ -52,11 +51,11 @@ $ARGUMENTS の形式: "{task description} --tier={S|M|L} --task-file={TASK_FILE}
 
 ## STEP 1: コードレビュー（並列）
 
-tier に応じたレビュアーを同時に起動する。
+tier に応じたレビュアーを同時に起動する。**レビュー中はコードを変更しない**（修正は差し戻しで team-implement が行う）。
 
 | tier | レビュアー |
 |---|---|
-| S（`--mode=self-review`） | Claude |
+| S | Claude |
 | M | Claude / OpenCode / Security |
 | L | Claude / OpenCode / Security / Simplify |
 
@@ -65,7 +64,7 @@ tier に応じたレビュアーを同時に起動する。
 | Claude | 変更ファイルを直接読み、Quality / Logic の観点でレビュー |
 | OpenCode | 下記。観点は Claude と同じ（別モデルによるセカンドオピニオン） |
 | Security | `$HOME/.claude/rules/security.md` のルールを変更コードに照合し、違反・懸念を severity 付きで列挙 |
-| Simplify | `/simplify` スキルを変更ファイルに対して実行 |
+| Simplify | 変更ファイルを読み、過剰な複雑さ・重複・再利用できる既存コードの観点で指摘する（`/simplify` はコードを書き換えるので使わない） |
 
 ### OpenCode Reviewer
 変更内容が長いのでプロンプトはファイルに落として渡す。
