@@ -70,7 +70,7 @@ Agent ツールが無いため、リサーチは**サブエージェント経由
 ### tier=M
 OpenCode に設計相談する（Bash から直接実行）。
 
-呼び出し形と注意点（バックグラウンド実行・`< /dev/null` 必須など）は `$HOME/.claude/rules/tool-routing.md` の「OpenCode リサーチの実行」に従う。
+呼び出し方・待ち方・失敗時の扱いは `$HOME/.claude/rules/tool-routing.md` の「OpenCode リサーチの実行」に従う。呼べなければ OpenCode なしで設計し、`DESIGN` に「OpenCode 不可: {理由}」と書く。
 得られた設計方針を `DESIGN` に含める。
 
 ### tier=L
