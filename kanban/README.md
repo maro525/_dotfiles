@@ -12,6 +12,26 @@ python3 -m taskboard .claude/docs/decisions --open
 
 No dependencies. Python 3.11+ standard library only.
 
+## Install
+
+Install once as an editable tool and `taskboard` works from any directory:
+
+```bash
+uv tool install --editable ~/src/_dotfiles/kanban
+taskboard --recursive ~/src --open
+```
+
+`--editable` matters. The tool environment points at this source tree rather
+than a copy, so edits here take effect on the next run with no reinstall.
+Reinstall only when `pyproject.toml` changes -- a new dependency or a renamed
+entry point -- via `uv tool install --editable --force ~/src/_dotfiles/kanban`.
+
+Run it on a new machine once per machine; the install lives in
+`~/.local/share/uv/tools`, not in this repo.
+
+Without installing, `python3 -m taskboard` still works, but only with this
+folder as the working directory.
+
 ## Why it exists
 
 `/orchestrate` keeps the whole pipeline in one place, so the `status:` field in
