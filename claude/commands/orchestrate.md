@@ -1,7 +1,6 @@
 ---
 name: orchestrate
 description: Project orchestrator — classify tier, create task file, run startproject → team-implement → team-review → deploy in sequence.
-context: fork
 model: opus[1m]
 color: green
 allowed-tools: Read, Write, Edit, Bash, Grep, Glob, Agent, Skill, AskUserQuestion, TodoWrite, mcp__linear-server__get_issue, mcp__linear-server__save_issue, mcp__linear-server__save_comment, mcp__linear-server__list_issue_statuses
@@ -31,6 +30,7 @@ $ARGUMENTS の形式: "{task description}"
 - 追加の指示がない限り STEP 7 まで完走する
 - **[MUST]** の付いたステップは、どの tier でもスキップしない
 - Linear への投稿・ステータス変更に失敗したら、黙って飛ばさずユーザーに報告する
+- orchestrate はメインのセッションで動き、各 command は fork（バックグラウンド）で動く。command を起動したら**完了通知で返却を受け取るまで次の手順に進まない**
 
 **原則として止まるのは以下の Gate のみ。** ただし各 command が途中でユーザーに確認を求めた場合（startproject の要件ヒアリングなど）は、それに従う。
 
