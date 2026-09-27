@@ -10,35 +10,27 @@ allowed-tools: Read, Write, Edit, Bash, Grep, Glob, AskUserQuestion, TodoWrite, 
 
 # deploy
 
-## モード判定
+git は `$HOME/.claude/rules/tool-routing.md` の「Git Operations」（保護ブランチ・ホスティング CLI）に従う。
 
 | 引数 | モード |
 |---|---|
-| `--task-file` あり | **Deploy Workflow モード**（`/orchestrate` STEP 6 から呼ばれる。以下の Input 以降） |
-| `--task-file` なし | **Ad-hoc Git モード**（下記。Input 以降の STEP は実行しない） |
+| `--task-file` あり | **Deploy Workflow モード**（`/orchestrate` STEP 6 から呼ばれる） |
+| `--task-file` なし | **Ad-hoc Git モード**（Deploy Workflow の STEP は実行しない） |
 
 ## Ad-hoc Git モード
 
-$ARGUMENTS で指示された書き込み系 git 操作（`$HOME/.claude/rules/tool-routing.md` の「Git Operations」の書き込み系）を実行する。
+$ARGUMENTS で指示された書き込み系 git 操作（「Git Operations」の書き込み系）を実行する。
 
-- `$HOME/.claude/rules/tool-routing.md` の「Git Operations」（保護ブランチ・ホスティング CLI）に従う
 - 履歴を書き換える操作（rebase、`reset --hard`、force push）は実行前にユーザーに確認する
 - 完了後、実行したコマンドと結果（コミットハッシュ・ブランチ名・PR/MR URL など）を日本語で簡潔に返す
 
----
-
 ## Deploy Workflow モード
 
-コミット・push・PR / MR 作成を担当する（動作検証は team-review で済んでいるので行わない）。
+コミット・push・PR / MR 作成を担当する（動作検証は team-review で済んでいるので行わない）。前提: feature ブランチ作成済み・team-review PASS 済み。
 
-**TASK_FILE への書き込みと Linear への投稿・ステータス変更は行わない。**
-結果は OUTPUT フォーマットで呼び出し元（`/orchestrate` STEP 6）に返し、
-TASK_FILE の更新・Linear コメント投稿・ステータス変更は呼び出し元が行う。
-TASK_FILE は Read のみ（`## startproject` / `## team-implement` / `## team-review` の参照用）。
+**TASK_FILE への書き込みと Linear への投稿・ステータス変更は行わない。** 結果は OUTPUT フォーマットで呼び出し元（`/orchestrate` STEP 6）に返し、TASK_FILE の更新・Linear コメント投稿・ステータス変更は呼び出し元が行う。TASK_FILE は Read のみ。
 
-前提: feature ブランチ作成済み・/team-review 完了済み・PASS 判定済み。
-
-## Input
+### Input
 
 ```
 $ARGUMENTS の形式: "{task description} --tier={S|M|L} --task-file={TASK_FILE} --linear-id={LINEAR_ID}"
@@ -50,57 +42,39 @@ $ARGUMENTS の形式: "{task description} --tier={S|M|L} --task-file={TASK_FILE}
 | `--task-file` | orchestrator が作成済みのタスクファイルパス |
 | `--linear-id` | orchestrator が確認済みの Linear タスク ID |
 
----
+### 事前準備
 
-## 事前準備
+開始前に必ず TASK_FILE の以下を読む。
 
-開始前に必ず以下を読む。
+1. `## team-review` の最新回 — PASS/FAIL 判定・申し送り事項
+2. `## Meta` の `branch:` / `base:` — push する作業ブランチと、その分岐元
+3. `## team-implement` — PR 本文に書く変更内容（複数回ある場合は全回）
 
-1. TASK_FILE の `## team-review` の最新回 — PASS/FAIL 判定・申し送り事項を確認
-2. TASK_FILE の `## Meta` の `branch:` / `base:` — push する作業ブランチと、その分岐元
-3. TASK_FILE の `## team-implement` — PR 本文に書く変更内容（複数回ある場合は全回）
+Review が FAIL なら PR を作らずに中止し、ユーザーに報告して終了する。
 
-Review が FAIL の場合は PR を作らずに中止し、ユーザーに報告して終了する。
-
----
-
-## Git ルール
-
-`$HOME/.claude/rules/tool-routing.md` の「Git Operations」（保護ブランチ・ホスティング CLI）に従う。
-
----
-
-## STEP 1: COMMIT
+### STEP 1: COMMIT
 
 作業ブランチ上の未コミット変更（team-implement の実装。レビュー通過済み）をコミットする。メッセージは `## team-implement` の内容から作る。
 
----
-
-## STEP 2: PUSH
+### STEP 2: PUSH
 
 `branch:` のブランチを `origin` に push する。
 
----
+### STEP 3: CREATE PR / MR
 
-## STEP 3: CREATE PR / MR
+base は `base:` のブランチ（空ならリポジトリのデフォルトブランチ）、タイトルは `{type}({scope}): {task description}`（`{type}` は変更内容に合う Conventional Commits の型: feat / fix / refactor / docs など）。
 
-base は `base:` のブランチ（空ならリポジトリのデフォルトブランチ）、タイトルは `{type}({scope}): {task description}` 形式。`{type}` は変更内容に合う Conventional Commits の型（feat / fix / refactor / docs など）。
-
-PR/MR 本文に含める内容:
+本文に含める内容:
 - 変更の概要
-- TASK_FILE の `## startproject` > `### Brief` から成功基準
-- TASK_FILE の `## team-review` から申し送り事項（minor指摘）
+- `## startproject` > `### Brief` の成功基準
+- `## team-review` の申し送り事項（minor 指摘）
 - 関連 Linear タスク: {LINEAR_ID}
 
----
-
-## STEP 4: RETURN TO ORIGINAL BRANCH
+### STEP 4: RETURN TO ORIGINAL BRANCH
 
 `base:` のブランチに戻る（空ならリポジトリのデフォルトブランチ）。
 
----
-
-## STEP 5: OUTPUT を返す
+### STEP 5: OUTPUT を返す
 
 以下のフォーマットを最終レスポンスとしてそのまま返す。
 

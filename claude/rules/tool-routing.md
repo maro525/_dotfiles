@@ -1,45 +1,40 @@
 # Tool Routing Rules
 
-**Defines which tools and operations are delegated to which agent.**
-
-外部リサーチは firecrawl MCP + OpenCode リサーチの二系統、設計相談は OpenCode に振り分ける。
+**どの操作をどのツール・エージェントに委譲するかを定める。**
+外部リサーチは firecrawl MCP + OpenCode の二系統、設計相談は OpenCode に振り分ける。使うかどうか自体は tier で決まる（`$HOME/.claude/rules/adaptive-execution.md` の「External Research」「OpenCode Design Consultation」）。本ファイルは「使う」となった場合の委譲先を定める。
 
 ## Skill Routing hook への応答
 
-`agent-router.py`（UserPromptSubmit hook）がスキル候補を `[Skill Routing]` として additionalContext に出す。ソフトな推奨として扱う。
+`agent-router.py`（UserPromptSubmit hook）が `[Skill Routing]` / `[Agent Routing]` を additionalContext に出す。ソフトな推奨として扱う。
 
-- **従う**: プロンプトの意図と一致し、ユーザーの明示指示と矛盾しない場合。提案に従う旨を一言伝えてから Skill ツールで起動する
+- **従う**: プロンプトの意図と一致し、ユーザーの明示指示と矛盾しないとき。従う旨を一言伝えて Skill ツールで起動する
 - **従わなくてよい**: ユーザーが別のことを明示している／提案スキルに対してタスクが小さすぎる（XS など）／進行中ワークフロー内の追加質問
 - 提案がずれていると思ったら、理由を伝えてユーザーに確認する
-
-## Adaptive Execution Override
-
-tier ごとに外部リサーチ・OpenCode を使うかどうかは `$HOME/.claude/rules/adaptive-execution.md` の「External Research」「OpenCode Design Consultation」に従う。以下のルーティングは、そこで「使う」となった場合の委譲先を定める。
 
 ## Routing Table
 
 | Operation | Delegate To | Method |
 |-----------|-------------|--------|
-| External research | **firecrawl MCP + OpenCode** | 二系統を並列実行し Claude が統合（下記セクション参照） |
+| External research | **firecrawl MCP + OpenCode** | 二系統を並列実行し Claude が統合（下記） |
 | PDF / 記事 (URL) | **firecrawl MCP** | `firecrawl_parse` / `firecrawl_scrape` |
 | 音声・動画 | **未対応** | 委託先なし。ユーザーに扱い方を確認する |
 | Library research | **firecrawl MCP + OpenCode** | `firecrawl_search` で一次情報 + OpenCode で実装知見 |
 | Design decisions | **OpenCode** | Subagent（`opencode run --agent plan -m github-copilot/gpt-5.6-sol`） |
 | git（書き込み系） | **`/deploy` skill** | Ad-hoc Git モード。読み取り系は Claude が直接 |
 | docker/ruff/uv (in `context: fork` skills) | **Direct** | スキル内で直接実行 |
-| docker/ruff/uv (ad-hoc) | **Subagent** | サブエージェント経由で直接実行 |
+| docker/ruff/uv (ad-hoc) | **Subagent** | サブエージェント内で実行 |
 | GitHub MCP / Linear MCP | **Direct or Subagent** | スキル内は直接、アドホックはサブエージェント |
 
 ## External Research via firecrawl MCP + OpenCode
 
-外部リサーチは **二系統を並列実行**し、Claude が突き合わせて統合する（`gemini` CLI は廃止済み）。
+二系統を **並列実行**し、Claude が突き合わせて統合する。
 
 | 系統 | ツール | 得意分野 |
 |------|-------|---------|
-| **一次情報** | firecrawl MCP | 公式ドキュメント・リリースノートの実文面。出典 URL が取れる |
-| **実装知見** | OpenCode CLI | 学習済み知識に基づく設計上の勘所・落とし穴・比較 |
+| **一次情報** | firecrawl MCP | 公式ドキュメント・リリースノートの実文面。出典 URL が取れるが解釈はしない |
+| **実装知見** | OpenCode CLI | 設計上の勘所・落とし穴・比較。解釈は出せるが出典を持たない |
 
-**併用の理由**: firecrawl は「現在の事実」を出典付きで取れるが解釈はしない。OpenCode は解釈と経験則を出せるが出典を持たない。両者が食い違った場合は **firecrawl の一次情報を優先**し、相違点と採用した方を記録する（`/startproject` では TASK_FILE の `### Design`）。
+食い違ったら **firecrawl の一次情報を優先**し、相違点と採用した方を成果物に記録する（`/startproject` では OUTPUT の `DESIGN`）。
 
 ### OpenCode リサーチの実行
 
@@ -49,33 +44,28 @@ tier ごとに外部リサーチ・OpenCode を使うかどうかは `$HOME/.cla
 opencode run --agent plan -m github-copilot/gpt-5.6-sol "{research question}" < /dev/null
 ```
 
-| 要素 | 理由（外すと壊れる） |
-|------|---------------------|
-| `--agent plan` **必須** | 既定の `build` エージェントは非対話実行だとパーミッション確認で**無言ハング**する（11 分無反応を実測）。stderr にも何も出ないので原因が分からない |
-| `< /dev/null` **必須** | stdin が**開いたパイプ**だと opencode は永久にハングする。`run_in_background: true` がまさにその状態を作る（フォアグラウンドの Bash 呼び出しには自動で付くが、バックグラウンドには付かない）。42 分と 12 分で kill された 2 回は stdout・stderr・ログすべて空。**下の「バックグラウンド実行必須」と必ずセットで使う** |
-| `2>/dev/null` を**付けない** | opencode はエラーを stderr に出しつつ **exit code 0** で終わる。潰すと「成功したのに出力が空」という紛らわしい結果になる |
-| `github-copilot/gpt-5.6-sol` が第一候補 | `openai/gpt-5.6-sol` は 2026-08-12 時点で `insufficient_quota` を返して**必ず失敗する**。一時的な超過ではなく残高切れ。課金が復活したら第一候補に戻す |
-| **バックグラウンド実行必須** | 込み入った質問は 10 分超。Bash ツールの既定 10 分では途中で kill されて出力ゼロになり、ハングと見分けがつかない |
-| cwd は **git リポジトリ**にする | 非 git ディレクトリ（`/tmp` 等）だと起動シーケンスの `service=vcs` 初期化で無言ハングする |
+| 要素 | 外すと壊れる理由 |
+|------|-----------------|
+| `--agent plan` **必須** | 既定の `build` は非対話実行だとパーミッション確認で**無言ハング**する。stderr にも何も出ない |
+| `< /dev/null` **必須** | stdin が**開いたパイプ**だと永久にハングする。`run_in_background: true` がまさにその状態（フォアグラウンドには自動で付くがバックグラウンドには付かない）。**バックグラウンド実行と必ずセット** |
+| `2>/dev/null` を**付けない** | エラーを stderr に出しつつ **exit code 0** で終わる。潰すと「成功したのに出力が空」に見える |
+| モデルは `github-copilot/gpt-5.6-sol` | `openai/gpt-5.6-sol` は残高切れ（`insufficient_quota`）で**必ず失敗する**。課金が復活したら第一候補に戻す |
+| **バックグラウンド実行必須** | 込み入った質問は 10 分超。Bash ツールの既定 10 分で kill されると出力ゼロになり、ハングと見分けがつかない |
+| cwd は **git リポジトリ** | 非 git ディレクトリ（`/tmp` 等）だと起動時の `service=vcs` 初期化で無言ハングする |
 
-- **完了はバックグラウンドタスクの完了通知で待つ。** `pgrep` や `tail --pid` で自前の監視をしない（`pgrep -f` は監視コマンド自身にマッチし、終了済みでもタイムアウトまで待ち続ける）
-- **モデルは上記で固定。** 失敗しても別のモデルに差し替えない
-- **呼べないときは諦めて先に進む。** quota / トークン不足 / 429 / 認証エラーなどで失敗したら（出力が空のときはログで理由を確認）、再試行やモデル変更はせず OpenCode なしで続ける。成果物（Design・レビュー結果など）に「OpenCode 不可: {理由}」と書く
+- **完了はバックグラウンドタスクの完了通知で待つ。** `pgrep` / `tail --pid` で自前監視しない（`pgrep -f` は監視コマンド自身にマッチし、タイムアウトまで待ち続ける）
+- **モデルは上記で固定。** 失敗しても差し替えない
+- **呼べないときは諦めて先に進む。** quota / 429 / 認証エラーなどで失敗したら、再試行もモデル変更もせず OpenCode なしで続け、成果物（Design・レビュー結果など）に「OpenCode 不可: {理由}」と書く
 - 長文プロンプトはファイルに落として `"$(cat prompt.txt)"` で渡す
-- ツール呼び出しで止まらせたくない場合はプロンプト冒頭に `DO NOT USE ANY TOOLS` と書く
-- 空出力を見たら quota と決めつけない。ログは `~/.local/share/opencode/log/` に 1 セッション 1 ファイル。
-  正常なセッションは `service=session id=` → `POST /session` → `service=snapshot hash=` → `resolveTools` →
-  `service=llm … stream` と進む。**`service=vcs … initialized` の後で止まっていれば stdin 詰まり**（`< /dev/null` を付け忘れ）で、cwd が非 git のときと同じ見た目になる
-- 疎通確認は `opencode run --agent plan -m <model> "Reply with exactly: PONG"`（数十秒で返る）
-- サブエージェント経由で実行し、メインコンテキストを汚さない
-- OpenCode はコードを実際に読まずに答えることがある。結論は採用してよいが**根拠は必ず自分で検証する**
+- ツール呼び出しで止まらせたくなければ、プロンプト冒頭に `DO NOT USE ANY TOOLS`
+- 空出力を quota と決めつけず、ログ（`~/.local/share/opencode/log/`、1 セッション 1 ファイル）で確認する。正常なら `service=session` → `POST /session` → `service=snapshot` → `resolveTools` → `service=llm … stream` と進む。**`service=vcs … initialized` で止まっていれば stdin 詰まり**（`< /dev/null` 忘れ）で、非 git cwd と同じ見た目になる
+- 疎通確認: `opencode run --agent plan -m <model> "Reply with exactly: PONG"`（数十秒で返る）
+- `context: fork` の command 内と `/startproject` は直接実行。それ以外はサブエージェント経由でメインコンテキストを汚さない
+- OpenCode はコードを読まずに答えることがある。結論は採用してよいが**根拠は必ず自分で検証する**
 
 ### Scope
 
-- ライブラリ・フレームワークの最新仕様、公式ドキュメント
-- リリースノート・変更履歴・非推奨情報
-- 既知の不具合・脆弱性・回避策
-- 実装事例・ベンチマーク・比較記事
+ライブラリ・フレームワークの最新仕様と公式ドキュメント／リリースノート・変更履歴・非推奨情報／既知の不具合・脆弱性・回避策／実装事例・ベンチマーク・比較記事
 
 ### Tools（firecrawl 系統）
 
@@ -89,50 +79,37 @@ opencode run --agent plan -m github-copilot/gpt-5.6-sol "{research question}" < 
 
 ### How to Route
 
-2 つのサブエージェントを **同時に起動**する（片方の結果を待たない）。
+Agent ツールで 2 つのサブエージェント（`subagent_type: general-purpose`、`run_in_background: true`）を**同時に起動**する（片方の結果を待たない）。
 
 ```
 # 系統 1: 一次情報
-Task tool parameters:
-- subagent_type: "general-purpose"
-- run_in_background: true
-- prompt: |
-    Research the following using the firecrawl MCP tools: {topic}
-
-    Start with firecrawl_search, then firecrawl_scrape the authoritative
-    sources (official docs / release notes) for detail.
-    Cite the source URL for every claim.
-
-    Save full output to: .claude/docs/research/{topic}-sources.md
-    Return CONCISE summary.
+Research the following using the firecrawl MCP tools: {topic}
+Start with firecrawl_search, then firecrawl_scrape the authoritative sources
+(official docs / release notes). Cite the source URL for every claim.
+Save full output to: .claude/docs/research/{topic}-sources.md
+Return CONCISE summary.
 
 # 系統 2: 実装知見
-Task tool parameters:
-- subagent_type: "general-purpose"
-- run_in_background: true
-- prompt: |
-    Run OpenCode research on: {topic}
-
-    opencode run --agent plan -m github-copilot/gpt-5.6-sol "{research question}" < /dev/null
-
-    Keep `--agent plan` and the `< /dev/null`, and do NOT append 2>/dev/null — see
-    "OpenCode リサーチの実行" in $HOME/.claude/rules/tool-routing.md for why.
-    Expect this to take over 10 minutes.
-
-    Save full output to: .claude/docs/research/{topic}-opencode.md
-    Return CONCISE summary, and flag anything you are NOT confident about
-    so it can be checked against the firecrawl sources.
+Run OpenCode research on: {topic}
+opencode run --agent plan -m github-copilot/gpt-5.6-sol "{research question}" < /dev/null
+Keep `--agent plan` and `< /dev/null`, do NOT append 2>/dev/null — see
+"OpenCode リサーチの実行" in $HOME/.claude/rules/tool-routing.md. Expect over 10 minutes.
+Save full output to: .claude/docs/research/{topic}-opencode.md
+Return CONCISE summary, and flag anything you are NOT confident about
+so it can be checked against the firecrawl sources.
 ```
 
-両者の結果を Claude が統合する。**食い違いがあれば firecrawl の一次情報を採用**し、相違点と採用した方を記録する。
+両者の結果を Claude が統合する（食い違いは firecrawl 優先）。
 
 ### Triggers
 
 | User Input | Action |
 |------------|--------|
-| 「調べて」「リサーチして」「最新バージョンは」 | firecrawl + OpenCode を並列実行 |
+| 「調べて」「リサーチして」「最新バージョンは」「使い方を調べて」 | firecrawl + OpenCode を並列実行 |
 | 「公式ドキュメントを見て」「仕様を確認して」 | firecrawl 主体（OpenCode は任意） |
 | 「既知の不具合はある?」「脆弱性を確認して」 | firecrawl + OpenCode を並列実行 |
+
+バージョン番号など「現在の事実」は firecrawl の結果を正とする。
 
 ### Exceptions (Claude handles directly)
 
@@ -140,7 +117,7 @@ Task tool parameters:
 
 ## Git Operations
 
-**書き込み系の git 操作は `/deploy`（Ad-hoc Git モード）経由で実行する。読み取り系は Claude が直接実行してよい。**
+**書き込み系は `/deploy`（Ad-hoc Git モード）経由、読み取り系は Claude が直接実行してよい。**
 
 | 分類 | コマンド | 実行者 |
 |------|---------|--------|
@@ -151,7 +128,7 @@ Task tool parameters:
 
 ### 保護ブランチ
 
-- **`release` / `staging` / `main`（master 含む）への直接コミット・push は、ユーザーの明示的な許可がない限り禁止**。反映は必ず PR / MR 経由
+- **`release` / `staging` / `main`（master 含む）への直接コミット・push は、ユーザーの明示的な許可がない限り禁止。** 反映は必ず PR / MR 経由
 - 保護ブランチ上で書き込み操作が必要になったら、feature ブランチを作成してから実行する（tier=XS も同様）
 
 ### ホスティング CLI
@@ -160,44 +137,29 @@ Task tool parameters:
 
 ## GitHub / Linear MCP Operations
 
-### アドホック操作
-
-スキル外での MCP 操作はサブエージェント経由で実行する。
+スキル外での MCP 操作はサブエージェント（Agent ツール、`general-purpose`）経由で実行する。
 
 ```
-Task tool parameters:
-- subagent_type: "general-purpose"
-- prompt: |
-    Perform the following MCP operation.
-    Task: {description}
-    Use Linear/GitHub MCP tools directly.
-    Report results back concisely in Japanese.
+Perform the following MCP operation.
+Task: {description}
+Use Linear/GitHub MCP tools directly.
+Report results back concisely in Japanese.
 ```
 
 ### Linear Triggers
 
 | User Input | Action |
 |------------|--------|
-| 「Linearにissue作って」 | サブエージェント経由で実行 |
-| 「チケットを更新して」 | サブエージェント経由で実行 |
-| 「タスクのステータスを変えて」 | サブエージェント経由で実行 |
+| 「Linearにissue作って」「チケットを更新して」「タスクのステータスを変えて」 | サブエージェント経由で実行 |
 
 ## Operational Commands (Subagent Routing)
 
-以下の操作はアドホック実行時にサブエージェント経由で実行する（コンテキスト分離のため）。
-`context: fork` スキル内では直接実行される。
-
-### 共通ルーティング方法
+以下はアドホック実行時、コンテキスト分離のためサブエージェント（Agent ツール、`general-purpose`）経由で実行する。`context: fork` スキル内では直接実行する。
 
 ```
-Task tool parameters:
-- subagent_type: "general-purpose"
-- prompt: |
-    Task: {description}
-    Execute the commands directly and report results concisely.
+Task: {description}
+Execute the commands directly and report results concisely.
 ```
-
-### 対象操作と Triggers
 
 | 操作 | コマンド例 | Triggers |
 |------|-----------|----------|
@@ -213,20 +175,3 @@ Task tool parameters:
 
 - ファイル内容の編集（Edit/Write ツール）
 - 新規ソースコード作成（Claude の領域）
-
-### 外部リサーチを使うケース（外部情報が必要な場合のみ）
-
-以下の場合はサブエージェント内で firecrawl MCP / OpenCode を併用する：
-
-- パッケージの最新バージョン・脆弱性チェック
-- 未知のライブラリの使い方調査
-
-```
-firecrawl_search: "Check the latest stable versions and known issues for: {packages}"
-→ 公式ドキュメント / リリースノートは firecrawl_scrape で本文を取得
-
-opencode run --agent plan -m github-copilot/gpt-5.6-sol "{same question}"
-→ `--agent plan` / `< /dev/null` / 「2>/dev/null を付けない」は必須。理由は「OpenCode リサーチの実行」参照
-→ バージョン番号など「現在の事実」は firecrawl の結果を正とする
-```
-
