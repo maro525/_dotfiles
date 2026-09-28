@@ -1,6 +1,6 @@
 ---
 name: orchestrate
-description: Project orchestrator — classify tier, create task file, run startproject → team-implement → team-review → deploy in sequence.
+description: Project orchestrator — classify tier, create task file, run startproject → team-implement → team-review → deploy in sequence. With --task-file, adds changes to an existing PR/MR (followup mode); with --phase and --ai, runs one phase of an existing task file with an external CLI (pi / cline / opencode / codex).
 model: opus[1m]
 color: green
 allowed-tools: Read, Write, Edit, Bash, Grep, Glob, Agent, Skill, AskUserQuestion, TodoWrite, mcp__linear-server__get_issue, mcp__linear-server__save_issue, mcp__linear-server__save_comment, mcp__linear-server__list_issue_statuses
@@ -17,11 +17,13 @@ $ARGUMENTS の形式: "{task description}"
 例: "PROJ-573をやりたいです"
 例: "カート機能にクーポン適用を追加する"
 例（追加修正モード）: "レビュー指摘の型エラーを直す --task-file=.claude/docs/decisions/task-PROJ-573-coupon.md"
+例（フェーズ指定モード）: "--task-file=.claude/docs/decisions/task-PROJ-573-coupon.md --phase=team-review --ai=pi"
+例（フェーズ指定モード・候補の採用）: "--task-file=.claude/docs/decisions/task-PROJ-573-coupon.md --phase=startproject --adopt=案 2"
 ```
 
 ## 実行原則
 
-**$ARGUMENTS を受け取ったら「モード判定」を行い、通常モードは STEP 0 から、追加修正モードは STEP 3F から開始する。追加の指示がない限り STEP 7 まで完走する。**
+**$ARGUMENTS を受け取ったら「モード判定」を行い、通常モードは STEP 0 から、追加修正モードは STEP 3F から、フェーズ指定モードは STEP 3P から開始する。通常・追加修正モードは追加の指示がない限り STEP 7 まで完走する。フェーズ指定モードは 1 フェーズを 1 回実行して STEP 7 の報告で終わる。**
 
 - 全 STEP を自律的に順番に実行する。報告・通知はするが応答を待たずに次へ進む
 - 質問が必要なら質問し、回答を受け取ったら止まらず続行する
@@ -45,9 +47,12 @@ $ARGUMENTS を受け取ったら最初にモードを決め、判定結果（モ
 | モード | 判定 | 開始 STEP |
 |---|---|---|
 | **通常モード** | 下記に該当しない | STEP 0 |
-| **追加修正モード** | (a) `--task-file={TASK_FILE}` で既存の `task-*.md` が指定された、または (b) Linear ID を検出し、`.claude/docs/decisions/task-{LINEAR_ID}-*.md` が存在する | STEP 3F |
+| **フェーズ指定モード** | `--phase={startproject\|team-implement\|team-review\|deploy}` がある（`--task-file` 必須） | STEP 3P |
+| **追加修正モード** | `--phase` がなく、(a) `--task-file={TASK_FILE}` で既存の `task-*.md` が指定された、または (b) Linear ID を検出し、`.claude/docs/decisions/task-{LINEAR_ID}-*.md` が存在する | STEP 3F |
 
 - (b) で該当ファイルが複数あれば `AskUserQuestion` で選ばせる
+- フェーズ指定モードは、既存 TASK_FILE の 1 フェーズだけを **別の AI（pi / cline / opencode / codex）** で 1 回実行し、結果を次の回・次の候補として TASK_FILE に追記するときに使う。Claude の command は呼ばず、`~/.agents/skills/{phase}/SKILL.md`（一般向けフェーズ定義。`$HOME/.claude/rules/tool-routing.md` の「外部 CLI のフェーズ実行」）を外部 CLI に読ませる
+- 呼び出し形: `/orchestrate "--task-file={TASK_FILE} --phase={phase} --ai={pi|cline|opencode|codex}[:{model}]"`、候補の採用は `/orchestrate "--task-file={TASK_FILE} --phase=startproject --adopt=案 {k}"`
 - 追加修正モードは、`/orchestrate` が PR / MR を出したタスクに追加の変更（レビュー指摘への対応、仕様の追加など）を加えるときに使う。既存 PR への追加変更は必ずこのモードを通し、orchestrator が直接編集して push しない（`$HOME/.claude/rules/tool-routing.md` の「/orchestrate で作った PR への追加変更」）
 - 呼び出し形: `/orchestrate "{追加の依頼} --task-file={TASK_FILE}"`（または `/orchestrate "{LINEAR_ID} {追加の依頼}"`）
 
@@ -209,6 +214,98 @@ n と m は独立に数える（差し戻しで m だけ増えることがある
 
 > **kanban の副作用:** `## deploy` が埋まった TASK_FILE の `status` を `implementing` に戻すため、追加修正中は kanban が deploy 列に stale（status が古い）として表示する。仕様として許容する。STEP 7 で `in-review` に戻ると解消する。
 
+## STEP 3P: フェーズ指定モード
+
+既存 TASK_FILE の **1 フェーズを 1 つの外部 AI で 1 回**実行し、結果を TASK_FILE に追記する。STEP 4〜6 には合流せず、P1〜P6 を順に実行して STEP 7 の報告で終わる。**`## Meta` の `status:` はこのモードでは一切変えない**（次に何を回すかはユーザーが決める）。並列実行はしない（1 回の呼び出しで 1 フェーズ × 1 AI）。
+
+### 引数
+
+| 引数 | 必須 | 意味 |
+|---|---|---|
+| `--task-file={TASK_FILE}` | 必須 | 既存の `task-*.md`。無ければ中止して案内する（新規タスクは通常モード） |
+| `--phase={phase}` | 必須 | `startproject` / `team-implement` / `team-review` / `deploy` |
+| `--ai={ai}[:{model}]` | `--adopt` 以外で必須 | `pi` / `cline` / `opencode` / `codex`。`:{model}` は各 CLI の `--model` にそのまま渡す（変換しない）。Claude の別モデルは対象外 |
+| `--adopt=案 {k}` | 任意 | `--phase=startproject` 専用。CLI を起動せず、候補 `### 案 {k}` を `### Brief / Design / Plan` に昇格させて終わる |
+
+### P1: TASK_FILE を読み、回数と前提を決める
+
+STEP 3F F1 と同じ場所から `LINEAR_ID` / `tier` / task description / `branch:` / `base:` を復元し、フェーズ別に次を決める。
+
+| phase | 決めるもの | 前提（満たさなければ中止して案内） |
+|---|---|---|
+| `startproject` | k = `## startproject` の `### 案 {k}` の最大 + 1（初回 1） | — |
+| `team-implement` | m = `## team-implement` の `### {m}回目` の最大 + 1（初回 1） | `### Brief / Design / Plan` が埋まっている（候補だけなら先に `--adopt`） |
+| `team-review` | m = `## team-implement` の最新回の番号（無ければ 1） | `## team-implement` が埋まっている |
+| `deploy` | — | `## team-review` の最新回が PASS、`branch:` が空でない |
+
+ラベルは `--label={ai}/{model}`（model 省略時は `{ai}`）。期待する見出し（P4 の確認に使う。**照合は「照合キー」の前方一致**。日時や括弧の中身は CLI が書くので事前に分からない）:
+
+| phase | 期待する見出し | 照合キー（前方一致） |
+|---|---|---|
+| `startproject` | `### 案 {k}（{label}、{日時}）` | `### 案 {k}（` |
+| `team-implement` / `team-review` | `### {m}回目（{label}）`（team-review で同じ見出しが既にあれば `### {m}回目（{label}、{日時}）`） | `### {m}回目（`（`## team-implement` にも同じ形の見出しがあるので、数えるのは `## {phase}` の節の中だけ。P3 で起動前の数を記録し、P4 で増えたことを確認する） |
+| `deploy` | `### PR / MR`（既に PR/MR URL があれば `#### 追加 push（…）`） | `### PR / MR` または `#### 追加 push（` |
+
+`--adopt=案 {k}` のとき: `### 案 {k}` の `#### Brief` / `#### Design` / `#### Plan` の本文を `### Brief` / `### Design` / `### Plan` にコピーし（既存の本文は上書き。`### Plan` 末尾の `#### 追加依頼 {n}` があれば残す）、候補の見出しに ` — 採用` を付けて（`### 案 {k}（{label}、{日時}） — 採用`）、P2〜P5 を飛ばして P6 へ。該当の候補が無ければ中止して案内する。
+
+### P2: プロンプトを作る
+
+外部 CLI に読ませる一般向けフェーズ定義は `SKILL_PATH = $HOME/.agents/skills/{phase}/SKILL.md`。無ければ中止し、dotfiles の `sync-agents.sh` の実行を案内する。プロンプトは `.claude/logs/phase-{phase}-{ai}-{YYYYMMDD-HHMM}.prompt.txt` に書き（`mkdir -p .claude/logs`。`.claude/` は gitignore 済み）、CLI には `"$(cat {prompt_file})"` で渡す。**実行日時は orchestrate が `date '+%Y-%m-%d %H:%M'` で取ってプロンプトに入れる**（CLI 側で推定させず、見出しの `{日時}` を orchestrate 側で確定させる。ログファイル名の日時と揃う）。
+
+```
+Read {SKILL_PATH} and follow it exactly as your instructions for this run.
+
+$ARGUMENTS: "{task description} --task-file={TASK_FILE の絶対パス} --tier={tier} --linear-id={LINEAR_ID} --label={label}"
+
+Current date and time: {YYYY-MM-DD HH:MM}. Use this value wherever the skill needs a timestamp; do not guess one.
+
+Work in {リポジトリの絶対パス}. End your final message with the `### RESULT` / `### SECTION` blocks the skill specifies.
+```
+
+`--linear-id` は `NOLINEAR` のときも書く（一般向けフェーズはこの値で Linear を飛ばす）。
+
+`--phase=team-review` では、`git branch --show-current` が `## Meta` の `branch:` と違えば中止して案内する（orchestrate は `git switch` しない。CLI に切り替えさせると P5 の比較でブランチ変更として出る）。差分は CLI が自分で `git` を実行して取るので、orchestrate はプロンプトに入れない。
+
+### P3: 外部 CLI を起動して完了を待つ
+
+呼び出し表は `$HOME/.claude/rules/tool-routing.md` の「外部 CLI のフェーズ実行」（起動オプションの唯一の定義。ここには書かない）。**全フェーズ同じ起動オプション**で、確認なしで編集・コマンド実行を許す（読み取り専用にしない。Gate 1 / Gate 2 でユーザー了承済み。理由は同ファイルの「権限」）。
+
+- startproject / team-review では、起動前にスナップショットを `.claude/logs/phase-{phase}-{ai}-{YYYYMMDD-HHMM}.before.txt` に残す（P5 で比較）: `git status --porcelain`、`git rev-parse HEAD`、`git branch --show-current`、`git for-each-ref`、`git stash list`
+- 全フェーズで、P4 用に `## {phase}` の節の中の照合キーの出現数を**常に**数えて記録する（P4 のコマンド）
+- `--ai=codex` は `-o {last}`（`--output-last-message`）で最終メッセージを `.claude/logs/phase-{phase}-{ai}-{YYYYMMDD-HHMM}.last.md` に書かせる。`-s workspace-write` に `.git` の `writable_roots` を足した形（deploy はさらに `network_access=true`）。`-s danger-full-access` は使わない
+- 起動は **background Bash** で `timeout -k 1m 30m {cli …} "$(cat {prompt_file})" < /dev/null > {log_file} 2>&1`（`log_file` は `.claude/logs/phase-{phase}-{ai}-{YYYYMMDD-HHMM}.log`）。`< /dev/null` を外さない（stdin が開いたままだとハングする CLI がある）。`2>/dev/null` は付けない
+- **完了通知が来るまで次に進まない。** `pgrep` やログの先読みで完了を推測しない
+- 失敗判定: exit code ≠ 0、または 124 / 137（timeout）、または P4 で節も `### SECTION` も無い。失敗時は log の末尾をユーザーに示して STEP 7 の報告で終わる（TASK_FILE には書かない）
+
+### P4: TASK_FILE を確認し、未書き込みなら代筆する
+
+**[MUST]** TASK_FILE の **`## {phase}` の節の中だけ**を対象に、P1 の照合キーで始まる見出し行を数え、P3 で記録した起動前の数より増えたかで判定する（日時・括弧の中身は照合しない。`### {m}回目（` は `## team-implement` にも現れるので、ファイル全体を `grep -c` しない）:
+
+````bash
+awk -v sec='## {phase}' -v key='{照合キー}' '/^```/{fence=!fence; next} fence{next} /^## /{f=($0==sec)} f && index($0,key)==1' {TASK_FILE} | wc -l
+````
+
+コードブロック（```` ``` ```` で囲まれた範囲）の中の `## ` / `### ` 行は節の切り替えにも数にも入れない（節の本文にコマンド例や見出しの例が引用されていることがある）。起動前後の値の差が 1 以上なら「増えている」。
+
+| 結果 | 動作 |
+|---|---|
+| 増えている | そのまま（`## Meta` の `status:` が変わっていたら元の値に戻し、ユーザーに報告する） |
+| 増えていない | 最終メッセージから `### SECTION` 以下を切り出し（下記「最終メッセージの取り出し」）、`## {phase}` の末尾に追記する（代筆）。team-implement は `### RESULT` の `branch:` / `base:` を `## Meta` に書く。startproject の `--label` なしは無いので `### 案 {k}` として追記する |
+| 節も `### SECTION` も無い | 失敗として報告する |
+| deploy が `pr: 中止（理由）`（`### SECTION` が `### 中止`） | 代筆せず、中止理由をそのまま報告する |
+
+最終メッセージの場所（ai ごと）と `### SECTION` の切り出し方は `$HOME/.claude/rules/tool-routing.md`「最終メッセージの取り出し」が唯一の定義（ここには書かない）。切り出した本文をそのまま追記する。
+
+どのフェーズも CLI が TASK_FILE に直接書くのが原則（`written: yes`）。サンドボックス等で書けなかった（`written: no`）ときだけ代筆になる。
+
+### P5: 作業ツリーと ref の確認
+
+startproject / team-review は TASK_FILE 以外を変更しない前提（SKILL.md の指示。起動オプションでは強制しない）。P3 のスナップショットと起動後の `git status --porcelain` / `git rev-parse HEAD` / `git branch --show-current` / `git for-each-ref` / `git stash list` を比べ、TASK_FILE 以外の作業ツリーの差分、HEAD・ブランチ・ref・stash の変化があれば「{phase}（{ai}）が TASK_FILE 以外を変更しました: {差分の内容}。内容を確認し、不要なら戻してください」と報告する（自動で戻さない。扱いはユーザーが決める）。簡単な比較なので、変更済みファイルの再編集や push のように見えない変化もある。team-implement / deploy は変更が前提なので比較しない。
+
+### P6: Linear と報告
+
+`### RESULT` の `linear:` が `未投稿` で LINEAR_ID が実在するなら、書いた節の要約を `mcp__linear-server__save_comment` で LINEAR_ID に投稿する（`posted` なら投稿しない）。**Linear のステータスと `## Meta` の `status:` は変えない。** その後 STEP 7 へ（Mode 行は `フェーズ指定（{phase}、{ai}[:{model}]、{見出し}）`。`--adopt` なら `フェーズ指定（startproject、案 {k} を採用）`）。
+
 ## STEP 4: team-implement を実行
 
 開始時に「状態管理」に従い TASK_FILE の `status` と Linear のステータスを更新する。**完了次第即 STEP 5 へ進む。**
@@ -287,7 +384,7 @@ deploy はコミット・push・PR / MR 作成（既存の PR / MR があれば�
 - Linear: {LINEAR_ID}
 - Tier: {tier}
 - Task File: {TASK_FILE}
-- Mode: 通常 | 追加修正（追加依頼 {n}、{m}回目）
+- Mode: 通常 | 追加修正（追加依頼 {n}、{m}回目） | フェーズ指定（{phase}、{ai}[:{model}]、{見出し}）
 
 ### 各フェーズのサマリー
 - startproject: ...（Gate 1: {GATE1}）
@@ -298,6 +395,8 @@ deploy はコミット・push・PR / MR 作成（既存の PR / MR があれば�
 
 追加修正モードでは startproject 行を「（追加修正モード: スキップ）」または再設計時の結果にし、deploy 行に既存 PR / MR の URL を書く。
 
+フェーズ指定モードでは実行したフェーズの行だけを書き（書いた見出し・代筆の有無・`### RESULT` のフェーズ固有行: gate1 / escalation / verdict / pr）、他の行は「（未実行）」にする。`status` は変えていないので、次に回すフェーズと呼び出し例（`/orchestrate "--task-file=… --phase=… --ai=…"` または `--adopt=案 {k}`）を末尾に添える。
+
 ## 状態管理
 
 orchestrator は以下を変数として保持し、全 command に引数で渡す。
@@ -306,9 +405,11 @@ orchestrator は以下を変数として保持し、全 command に引数で渡�
 |---|---|
 | `tier` | STEP 0（追加修正モードは STEP 3F F1 で `## Meta` の `tier:` から復元。F3 の再設計で更新） |
 | `LINEAR_ID` | STEP 1（追加修正モードは STEP 3F F1 で `## Meta` の `linear_id:` から復元） |
-| `TASK_FILE` | STEP 2（追加修正モードは $ARGUMENTS または Linear ID から特定） |
+| `TASK_FILE` | STEP 2（追加修正モードは $ARGUMENTS または Linear ID から特定。フェーズ指定モードは $ARGUMENTS の `--task-file` 必須） |
 
-作業ブランチとその分岐元は、引数ではなく TASK_FILE の `## Meta` の `branch:` / `base:` で受け渡す（STEP 4 で記入。追加修正モードでは既存の値をそのまま使う）。
+作業ブランチとその分岐元は、引数ではなく TASK_FILE の `## Meta` の `branch:` / `base:` で受け渡す（STEP 4 で記入。追加修正モードでは既存の値をそのまま使う。フェーズ指定モードの team-implement は外部 CLI が書き、未書き込みなら P4 で代筆する）。
+
+フェーズ指定モード（STEP 3P）は `status` と Linear ステータスを**変えない**。下表は通常・追加修正モードだけに適用する。
 
 ### TASK_FILE の `status` と Linear ステータス
 
