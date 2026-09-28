@@ -52,7 +52,7 @@ tier に応じたレビュアーを同時に起動する。**レビュー中は�
 | レビュアー | 方法 |
 |-----------|------|
 | Primary | 変更ファイルを自分で直接読み、Quality / Logic の観点でレビュー |
-| Second Opinion | `task` tool で subagent を起動し、観点は Primary と同じ（別コンテキストでの独立したセカンドオピニオン）。severity 付きの指摘リストを返させる |
+| Second Opinion | `task` tool で subagent を起動し、観点は Primary と同じ（別コンテキストでの独立したセカンドオピニオン）。severity 付きの指摘リストを返させる。変更内容が長いのでプロンプトはファイルに落として渡す。起動がエラー・空返却で終わったら再試行・差し替えせずこのレビュアーは飛ばし、結果の「Second Opinion Reviewer」に「Second Opinion 不可: {理由}」と書く（`AGENTS.md` の「OpenCode 仕様メモ」） |
 | Security | `$HOME/.claude/rules/security.md` のルールを変更コードに照合し、違反・懸念を severity 付きで列挙 |
 | Simplify | 変更ファイルを読み、過剰な複雑さ・重複・再利用できる既存コードの観点で指摘する（コードを書き換えるスキルは使わない） |
 
@@ -95,12 +95,12 @@ tier に応じたレビュアーを同時に起動する。**レビュー中は�
 
 ## OUTPUT
 
-TASK_FILE の `## team-review` に `### {n}回目` として追記する（FAIL の場合も必ず書き込む。既存の回は上書きしない）。
+TASK_FILE の `## team-review` に `### {m}回目` として追記する（FAIL の場合も必ず書き込む。既存の回は上書きしない）。`{m}` は `## team-implement` の最新回と同じ番号（実装・レビューの回数。追加依頼の番号 `{n}` とは別）。
 
 ```markdown
 ## team-review
 
-### {n}回目
+### {m}回目
 
 #### 判定: PASS / FAIL
 
