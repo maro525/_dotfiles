@@ -9,13 +9,29 @@ permission:
 
 # startproject
 
-計画フェーズ（Phase 1–3）を担当。TASK_FILE を SSoT として更新する。エスカレーションで再実行された場合は既存の `## startproject` を上書きする。
+計画フェーズ（Phase 1–3）を担当。TASK_FILE を SSoT として更新する。再実行された場合は既存の `## startproject` を上書きする（「再実行時の上書き」）。
 
 ## Input
 
 ```
 $ARGUMENTS: "{task description} --tier={S|M|L} --task-file={TASK_FILE} --linear-id={LINEAR_ID}"
 ```
+
+## 再実行時の上書き
+
+以下のいずれかで再実行された場合は、既存の `## startproject`（Brief / Design / Plan）を上書きする。追記ではなく書き直す。
+
+| 再実行の経路 | 見分け方 |
+|------|------|
+| エスカレーション（`/orchestrate` STEP 4-1） | `## team-implement` の最新回に `#### ESCALATION` がある |
+| 追加修正モードの再設計（`/orchestrate` STEP 3F F3） | task description に `（再設計: 追加依頼 {n}: …）` が含まれる |
+
+再設計で再実行された場合:
+
+- 上書きする前に既存の `## startproject` と `### Plan` 末尾の `#### 追加依頼 {n}`、`## team-implement` / `## team-review` / `## deploy` を読み、**既存 PR で実装済みの部分**と**追加依頼の内容**を把握する
+- Brief / Design / Plan は、既存 PR で実装済みの部分と追加依頼を踏まえて書き直す（Plan では実装済みの項目にその旨を書き、追加依頼を含む再設計分が実装対象だと分かるようにする）
+- `#### 追加依頼 {n}` は書かない（上書きで消えてよい。orchestrate が F3 手順 4 で `### Plan` 末尾に再掲する）
+- `## Meta` の `branch:` / `base:` と `## team-implement` 以降の節には触らない
 
 ---
 
@@ -42,7 +58,7 @@ $ARGUMENTS: "{task description} --tier={S|M|L} --task-file={TASK_FILE} --linear-
 
 `Design` に書く内容: 採用した方針とその理由 / 検討して却下した案 / 主要な変更ファイル。
 
-設計相談は `task` tool で subagent を起動する（同モデル・別コンテキストで独立性を確保）。
+設計相談は `task` tool で subagent を起動する（同モデル・別コンテキストで独立性を確保）。起動がエラー・空返却で終わったら再試行・差し替えせず、自分で設計して `Design` に「設計相談不可: {理由}」と書く（`AGENTS.md` の「OpenCode 仕様メモ」）。
 外部リサーチは firecrawl MCP（`firecrawl_search` / `firecrawl_scrape`）を使う。
 
 ### tier=S
