@@ -43,26 +43,84 @@ Claude 固有要素（`context: fork`、`agent:`、`allowed-tools`、`model:`、
 | opencode | `.opencode/skills`、`~/.config/opencode/skills`、`.claude/skills`、`~/.claude/skills`、`.agents/skills`、`~/.agents/skills` — [Agent Skills](https://opencode.ai/docs/skills/) |
 | codex | `$CWD/.agents/skills`、`$CWD/../.agents/skills`、`$REPO_ROOT/.agents/skills`、`$HOME/.agents/skills`、`/etc/codex/skills` — [Build skills](https://developers.openai.com/codex/skills) |
 
-orchestrate のフェーズ指定モードは探索に頼らず、プロンプトで `Read {abs path}/SKILL.md and follow it` と絶対パスを渡す（CLI ごとの探索差を吸収するため）。
+orchestrate のフェーズ指定モードは探索に頼らず、プロンプトで `Read {abs path}/SKILL.md and follow it` と絶対パスを渡す（CLI ごとの探索差を吸収するため）。各 CLI の起動オプションは下の「外部 CLI のフェーズ実行」。
 
-**各 CLI の起動オプション（モデル指定・最終メッセージの取り出しを含む）は `../claude/rules/tool-routing.md` の「外部 CLI のフェーズ実行」の表が唯一の定義。** この README には起動例を書かない（2 か所に書くと食い違う）。手で 1 フェーズを回すときも同じ表のコマンドに `"$(cat {prompt_file})"` を渡す。
+## 外部 CLI のフェーズ実行
+
+`/orchestrate` のフェーズ指定モード（`../claude/commands/orchestrate.md` STEP 3P）が、既存 TASK_FILE の 1 フェーズを外部 CLI に実行させるときの呼び出し表。対象 CLI は **pi / cline / opencode / codex**（Claude の別モデルは対象外。`context: fork` の command は frontmatter の `model` が優先され `--model` で変えられない）。読ませる定義は `~/.agents/skills/{phase}/SKILL.md`（この `skills/` の配布先。配布は `../sync-agents.sh`）。
+
+**CLI の起動オプション・権限・最終メッセージの取り出し・共通則は、この節が唯一の定義。** `../claude/rules/tool-routing.md` には書かない（毎回読み込まれるファイルだが、この内容を使うのはフェーズ指定モードだけ）。手で 1 フェーズを回すときも同じ表のコマンドに `"$(cat {prompt_file})"` を渡す。
+
+### orchestrate からの参照
+
+この README は `~/.claude` に同期されない（`sync-claude.sh` の対象は `claude/` 配下だけ）ので、orchestrate.md STEP 3P は dotfiles のチェックアウトを次の順で探し、`{DOTFILES}/agents/README.md` のこの節を読む（P2 で解決し、P3 / P4 で使う）:
+
+1. 環境変数 `DOTFILES` が設定されていて `$DOTFILES/agents/README.md` がある → それ
+2. `$HOME/src/_dotfiles/agents/README.md` がある → それ
+3. どちらも無ければ中止し、ユーザーに dotfiles のパスを尋ねる（推測で続けない。`sync-agents.sh` の案内と同じ扱い）
+
+リポジトリを `~/src/_dotfiles` 以外に置いたら `DOTFILES` を設定する。この README を `~/.claude` や `~/.agents` にコピーして配布することはしない（コピーは古くなるし、この節を使うのは orchestrate だけ）。
+
+### 呼び出し表
+
+**全フェーズ同じ起動オプションで動かす（読み取り専用にしない）。** startproject / team-review も team-implement / deploy と同じく、確認なしで編集・コマンド実行を許す指定で起動する（Gate 1 / Gate 2 でユーザー了承済み。理由は下の「権限」）。`{prompt}` は orchestrate が作ったプロンプトファイルの中身（`"$(cat {prompt_file})"`）、`{repo}` は対象リポジトリの絶対パス、`{last}` は `{log_file}` と同じ場所の `.last.md`。
+
+| ai | 起動（全フェーズ共通） | モデル指定（`--ai={ai}:{model}`） |
+|---|---|---|
+| `pi` | `pi -p --no-session "{prompt}"` | `--model {model}`（`provider/id` 形式可） |
+| `cline` | `cline --json --auto-approve true -t 1800 "{prompt}"` | `-m {model}`（provider は cline の設定値。変えるなら `-P {provider}` を併記） |
+| `opencode` | `opencode run --agent build --dangerously-skip-permissions "{prompt}"` | `-m {provider/model}` |
+| `codex` | `codex exec -s workspace-write -c 'sandbox_workspace_write.writable_roots=["{repo}/.git"]' -o {last} "{prompt}"`。deploy は push のため `-c 'sandbox_workspace_write.network_access=true'` を加える | `-m {model}` |
+
+- モデル名は**変換せずそのまま**渡す（各 CLI で通る名前をユーザーが指定する）
+- **codex に `-s danger-full-access` は使わない。** `workspace-write` は writable root 配下の `.git` を読み取り専用にするため、`git checkout -b` / `git commit` が失敗する。`.git` を `writable_roots` に足せば足り、deploy の push は `network_access=true` で通る（キー名は codex の config reference `sandbox_workspace_write.writable_roots` / `.network_access`）。codex を更新したら `codex exec --help` と config reference でキー名が生きているか確認する
+- codex の最終メッセージは `-o {last}`（`--output-last-message`）でファイルに取る。stdout は `--json` を付けなくてもイベントログが混ざるので、そこから拾わない
+- `which -a codex` で複数見つかる環境（WSL で Windows 側の `npm` の codex が先に来る等）では、PATH の先頭がどちらかを `codex --version` で確認してから使う
+- cline の `--json` は 1 行 1 JSON のストリーム（`text` はエスケープ済み）。最終メッセージは `"type":"run_result"` 行の `text`（下記「最終メッセージの取り出し」）
+- どのフェーズも CLI が TASK_FILE に直接書く（`written: yes`）。サンドボックス等で書けなかったとき（`written: no`）だけ orchestrate が `### SECTION` から代筆する（STEP 3P P4）。startproject / team-review では起動前後で作業ツリー・HEAD・ref・stash を比べ、TASK_FILE 以外に変化があれば報告する（P5）
+- codex 0.80.0 は ChatGPT アカウントで使えるモデルが無く全モデル失敗する（2026-09-28 実測）。`npm i -g @openai/codex@latest` で更新してから使う（下の「実機の状態」）
+- opencode は quota 切れ（429）だと無出力に見える。ログ（`~/.local/share/opencode/log/`）の 429 を先に確認する（`../claude/rules/tool-routing.md`「OpenCode リサーチの実行」）
 
 ### 権限
 
-**全フェーズ同じ権限で動く（読み取り専用にしない）。** startproject / team-review も、team-implement / deploy と同じ「確認なしで編集・コマンド実行を許す」指定で起動する（理由は tool-routing.md「外部 CLI のフェーズ実行 › 権限」）。startproject / team-review が TASK_FILE 以外を変更しないのは SKILL.md の指示によるもので、起動オプションでは強制しない。orchestrate は起動前後の簡単な比較で TASK_FILE 以外の変化を報告する（orchestrate.md STEP 3P P5）。
+**全フェーズ同じ権限で動く。読み取り専用にしない**（Gate 2 のユーザー判断、2026-09-29）。理由: 読み取りフェーズだけ絞っても、各 CLI の「読み取り専用」は実態と一致しなかった（pi の `bash` は `~/.pi/agent/extensions/permissions/` の許可リストで `git push` / `python3` まで通り、opencode の許可リストにはサブエージェント起動などの抜け道が残った）うえ、絞ると `date` / `git` / テストが使えず orchestrate 側の代筆・差分渡し・検知の手順が肥大した。
 
-### codex の注意
+- startproject / team-review が TASK_FILE 以外を変更しないのは **SKILL.md の指示**によるもので、起動オプションでは強制しない。orchestrate は起動前後の簡単な比較で TASK_FILE 以外の変化を報告する（orchestrate.md STEP 3P P5）
+- リポジトリ内の文章に仕込まれた指示に従う危険はどのフェーズにもある。信頼できないリポジトリでは使わない
 
-- 全フェーズ `-s workspace-write` に **`.git` を `writable_roots` に足す**（tool-routing.md の表）。`workspace-write` は writable root 配下の `.git` を読み取り専用にするため、そのままでは `git checkout -b` / `git commit` が失敗する。deploy は push のため `sandbox_workspace_write.network_access=true` も付ける。`-s danger-full-access` は使わない
-- 最終メッセージは `-o {file}`（`--output-last-message`）でファイルに取る。stdout は `--json` を付けなくてもイベントログが混ざる
-- `which -a codex` で複数見つかる環境（WSL で Windows 側の `npm` の codex が先に来る等）では、PATH の先頭がどちらかを `codex --version` で確認してから使う
+### 最終メッセージの取り出し（STEP 3P P4）
+
+| ai | 最終メッセージ |
+|---|---|
+| `pi` / `opencode` | `{log_file}` の末尾（プレーンテキスト） |
+| `codex` | `{last}`（`-o` で書かせたファイル） |
+| `cline` | `grep '"type":"run_result"' {log_file} \| tail -n 1 \| jq -r .text`（`jq` が無ければ `python3 -c 'import sys,json; print(json.loads(sys.stdin.readline())["text"])'`） |
+
+取り出したテキストから `### SECTION` 以下を切り出す: `awk '/^### SECTION/{f=1;next} f'`（`### RESULT` は追記しない）。
+
+### 共通則
+
+| 要素 | 理由 |
+|---|---|
+| `< /dev/null` **必須** | stdin が開いたパイプだと pi / opencode / codex はハングする（codex はプロンプト未指定時に stdin を読む） |
+| `timeout -k 1m 30m` | 実装フェーズは 10 分を超える。Bash の既定 10 分では kill されて出力ゼロになる |
+| **バックグラウンド実行必須** | 同上。完了通知で待ち、`pgrep` やログ先読みで完了を推測しない |
+| `2>/dev/null` を**付けない** | エラーが stderr に出て exit 0 で終わる CLI がある。`> {log} 2>&1` で両方を残す |
+| cwd は対象リポジトリ | 各 CLI は cwd からリポジトリの指示ファイル・スキルを探す。非 git ディレクトリではハングする CLI がある（opencode） |
+| ログは `.claude/logs/phase-{phase}-{ai}-{日時}.log` | プロンプトも同じ場所に `.prompt.txt`、codex の最終メッセージは `.last.md` で残す（`.claude/` は gitignore 済み） |
+
+```bash
+timeout -k 1m 30m {上表のコマンド} "$(cat {prompt_file})" < /dev/null > {log_file} 2>&1
+```
+
+失敗判定は orchestrate 側（exit ≠ 0 / 124・137 / 節も `### SECTION` も無い）。再試行・モデル差し替えは自動では行わず、ユーザーに報告する。
 
 ### 実機の状態（2026-09-28）
 
 | CLI | 状態 |
 |---|---|
-| pi | `pi -p --no-session --tools read,grep,find,ls[,bash]` で動作確認済み（`~/.agents/skills` が見える。`bash` ありでは TASK_FILE に自分で書けた）。`--tools` 制限なしの起動（tool-routing.md の表）は未検証。pi の bash で何が通るかは `~/.pi/agent/extensions/permissions/` の許可リストで決まる |
-| cline | `cline --json -t 150` で動作確認済み |
+| pi | `pi -p --no-session --tools read,grep,find,ls[,bash]` で動作確認済み（`~/.agents/skills` が見える。`bash` ありでは TASK_FILE に自分で書けた）。`--tools` 制限なしの起動（上の呼び出し表）は未検証。pi の bash で何が通るかは `~/.pi/agent/extensions/permissions/` の許可リストで決まる |
+| cline | `cline --json -t 150` で動作確認済み。`--auto-approve true` での起動は未検証 |
 | opencode | 429 quota_exceeded（retry-after 約 2.4 日）。復旧後に追試 |
 | codex | 0.80.0 は ChatGPT アカウントで使えるモデルが無く全モデル失敗。**`npm i -g @openai/codex@latest` で更新してから使う** |
 

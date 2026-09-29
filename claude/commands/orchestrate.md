@@ -51,7 +51,7 @@ $ARGUMENTS を受け取ったら最初にモードを決め、判定結果（モ
 | **追加修正モード** | `--phase` がなく、(a) `--task-file={TASK_FILE}` で既存の `task-*.md` が指定された、または (b) Linear ID を検出し、`.claude/docs/decisions/task-{LINEAR_ID}-*.md` が存在する | STEP 3F |
 
 - (b) で該当ファイルが複数あれば `AskUserQuestion` で選ばせる
-- フェーズ指定モードは、既存 TASK_FILE の 1 フェーズだけを **別の AI（pi / cline / opencode / codex）** で 1 回実行し、結果を次の回・次の候補として TASK_FILE に追記するときに使う。Claude の command は呼ばず、`~/.agents/skills/{phase}/SKILL.md`（一般向けフェーズ定義。`$HOME/.claude/rules/tool-routing.md` の「外部 CLI のフェーズ実行」）を外部 CLI に読ませる
+- フェーズ指定モードは、既存 TASK_FILE の 1 フェーズだけを **別の AI（pi / cline / opencode / codex）** で 1 回実行し、結果を次の回・次の候補として TASK_FILE に追記するときに使う。Claude の command は呼ばず、`~/.agents/skills/{phase}/SKILL.md`（一般向けフェーズ定義）を外部 CLI に読ませる。CLI の呼び出し表は dotfiles の `agents/README.md`「外部 CLI のフェーズ実行」（`~/.claude` には同期されないので、読み方は STEP 3P P2）
 - 呼び出し形: `/orchestrate "--task-file={TASK_FILE} --phase={phase} --ai={pi|cline|opencode|codex}[:{model}]"`、候補の採用は `/orchestrate "--task-file={TASK_FILE} --phase=startproject --adopt=案 {k}"`
 - 追加修正モードは、`/orchestrate` が PR / MR を出したタスクに追加の変更（レビュー指摘への対応、仕様の追加など）を加えるときに使う。既存 PR への追加変更は必ずこのモードを通し、orchestrator が直接編集して push しない（`$HOME/.claude/rules/tool-routing.md` の「/orchestrate で作った PR への追加変更」）
 - 呼び出し形: `/orchestrate "{追加の依頼} --task-file={TASK_FILE}"`（または `/orchestrate "{LINEAR_ID} {追加の依頼}"`）
@@ -248,9 +248,15 @@ STEP 3F F1 と同じ場所から `LINEAR_ID` / `tier` / task description / `bran
 
 `--adopt=案 {k}` のとき: `### 案 {k}` の `#### Brief` / `#### Design` / `#### Plan` の本文を `### Brief` / `### Design` / `### Plan` にコピーし（既存の本文は上書き。`### Plan` 末尾の `#### 追加依頼 {n}` があれば残す）、候補の見出しに ` — 採用` を付けて（`### 案 {k}（{label}、{日時}） — 採用`）、P2〜P5 を飛ばして P6 へ。該当の候補が無ければ中止して案内する。
 
-### P2: プロンプトを作る
+### P2: 呼び出し表を読み、プロンプトを作る
 
-外部 CLI に読ませる一般向けフェーズ定義は `SKILL_PATH = $HOME/.agents/skills/{phase}/SKILL.md`。無ければ中止し、dotfiles の `sync-agents.sh` の実行を案内する。プロンプトは `.claude/logs/phase-{phase}-{ai}-{YYYYMMDD-HHMM}.prompt.txt` に書き（`mkdir -p .claude/logs`。`.claude/` は gitignore 済み）、CLI には `"$(cat {prompt_file})"` で渡す。**実行日時は orchestrate が `date '+%Y-%m-%d %H:%M'` で取ってプロンプトに入れる**（CLI 側で推定させず、見出しの `{日時}` を orchestrate 側で確定させる。ログファイル名の日時と揃う）。
+**呼び出し表の場所を先に解決する。** 外部 CLI の起動オプション・権限・最終メッセージの取り出し・共通則は dotfiles の `agents/README.md`「外部 CLI のフェーズ実行」が唯一の定義で、`~/.claude` には同期されない（`sync-claude.sh` の対象外）。次の順で `DOTFILES` を決め、`{DOTFILES}/agents/README.md` の同節を Read してから P3 / P4 で使う:
+
+1. 環境変数 `DOTFILES` が設定されていて `$DOTFILES/agents/README.md` がある → それ（`echo "${DOTFILES:-}"` で確認）
+2. `$HOME/src/_dotfiles/agents/README.md` がある → それ
+3. どちらも無ければ中止し、`AskUserQuestion` で dotfiles のチェックアウトのパスを尋ねる（推測で続けない）
+
+外部 CLI に読ませる一般向けフェーズ定義は `SKILL_PATH = $HOME/.agents/skills/{phase}/SKILL.md`。無ければ中止し、`{DOTFILES}/sync-agents.sh` の実行を案内する。プロンプトは `.claude/logs/phase-{phase}-{ai}-{YYYYMMDD-HHMM}.prompt.txt` に書き（`mkdir -p .claude/logs`。`.claude/` は gitignore 済み）、CLI には `"$(cat {prompt_file})"` で渡す。**実行日時は orchestrate が `date '+%Y-%m-%d %H:%M'` で取ってプロンプトに入れる**（CLI 側で推定させず、見出しの `{日時}` を orchestrate 側で確定させる。ログファイル名の日時と揃う）。
 
 ```
 Read {SKILL_PATH} and follow it exactly as your instructions for this run.
@@ -268,11 +274,11 @@ Work in {リポジトリの絶対パス}. End your final message with the `### R
 
 ### P3: 外部 CLI を起動して完了を待つ
 
-呼び出し表は `$HOME/.claude/rules/tool-routing.md` の「外部 CLI のフェーズ実行」（起動オプションの唯一の定義。ここには書かない）。**全フェーズ同じ起動オプション**で、確認なしで編集・コマンド実行を許す（読み取り専用にしない。Gate 1 / Gate 2 でユーザー了承済み。理由は同ファイルの「権限」）。
+呼び出し表は P2 で読んだ `{DOTFILES}/agents/README.md` の「外部 CLI のフェーズ実行 › 呼び出し表」（起動オプションの唯一の定義。ここには書かない）。**全フェーズ同じ起動オプション**で、確認なしで編集・コマンド実行を許す（読み取り専用にしない。Gate 1 / Gate 2 でユーザー了承済み。理由は同節の「権限」）。
 
 - startproject / team-review では、起動前にスナップショットを `.claude/logs/phase-{phase}-{ai}-{YYYYMMDD-HHMM}.before.txt` に残す（P5 で比較）: `git status --porcelain`、`git rev-parse HEAD`、`git branch --show-current`、`git for-each-ref`、`git stash list`
 - 全フェーズで、P4 用に `## {phase}` の節の中の照合キーの出現数を**常に**数えて記録する（P4 のコマンド）
-- `--ai=codex` は `-o {last}`（`--output-last-message`）で最終メッセージを `.claude/logs/phase-{phase}-{ai}-{YYYYMMDD-HHMM}.last.md` に書かせる。`-s workspace-write` に `.git` の `writable_roots` を足した形（deploy はさらに `network_access=true`）。`-s danger-full-access` は使わない
+- `--ai=codex` は呼び出し表のとおり `-o {last}` で最終メッセージを `.claude/logs/phase-{phase}-{ai}-{YYYYMMDD-HHMM}.last.md` に書かせる（サンドボックスのオプションも表に従う。ここで変えない）
 - 起動は **background Bash** で `timeout -k 1m 30m {cli …} "$(cat {prompt_file})" < /dev/null > {log_file} 2>&1`（`log_file` は `.claude/logs/phase-{phase}-{ai}-{YYYYMMDD-HHMM}.log`）。`< /dev/null` を外さない（stdin が開いたままだとハングする CLI がある）。`2>/dev/null` は付けない
 - **完了通知が来るまで次に進まない。** `pgrep` やログの先読みで完了を推測しない
 - 失敗判定: exit code ≠ 0、または 124 / 137（timeout）、または P4 で節も `### SECTION` も無い。失敗時は log の末尾をユーザーに示して STEP 7 の報告で終わる（TASK_FILE には書かない）
@@ -294,7 +300,7 @@ awk -v sec='## {phase}' -v key='{照合キー}' '/^```/{fence=!fence; next} fenc
 | 節も `### SECTION` も無い | 失敗として報告する |
 | deploy が `pr: 中止（理由）`（`### SECTION` が `### 中止`） | 代筆せず、中止理由をそのまま報告する |
 
-最終メッセージの場所（ai ごと）と `### SECTION` の切り出し方は `$HOME/.claude/rules/tool-routing.md`「最終メッセージの取り出し」が唯一の定義（ここには書かない）。切り出した本文をそのまま追記する。
+最終メッセージの場所（ai ごと）と `### SECTION` の切り出し方は P2 で読んだ `{DOTFILES}/agents/README.md` の「外部 CLI のフェーズ実行 › 最終メッセージの取り出し」が唯一の定義（ここには書かない）。切り出した本文をそのまま追記する。
 
 どのフェーズも CLI が TASK_FILE に直接書くのが原則（`written: yes`）。サンドボックス等で書けなかった（`written: no`）ときだけ代筆になる。
 
