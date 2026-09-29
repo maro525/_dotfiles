@@ -16,6 +16,12 @@ So a card's column is the furthest-along of two independent signals:
 
 with one asymmetry: `done` is a claim about intent that no amount of file
 content can prove, so only `declared` may assert it.
+
+Evidence has one cap of its own. When the latest `## team-review` round is a
+FAIL, the task has been sent back at Gate 2 and is being reworked (or is
+waiting to be reviewed again): the review content is evidence of
+`implementing`, not of `review`. Without that cap every sent-back task would
+show up in the review column flagged stale.
 """
 
 from __future__ import annotations
@@ -113,6 +119,16 @@ def normalize_status(status_raw: str | None) -> Phase | None:
     return None
 
 
+def _sent_back(task: ParsedTask) -> bool:
+    """True when the latest review round failed and nothing has passed since.
+
+    The round counts are deliberately not compared: a rework round written
+    under `## team-implement` does not turn the failed review into evidence of
+    `review`. Only a new review round does, and it carries its own verdict.
+    """
+    return task.latest_review_verdict == "FAIL"
+
+
 def evidence_phase(task: ParsedTask) -> Phase | None:
     """Derive the furthest phase the file shows actual evidence of reaching.
 
@@ -121,6 +137,8 @@ def evidence_phase(task: ParsedTask) -> Phase | None:
     """
     for phase, sections, tag in _EVIDENCE_RULES:
         if sections & task.filled_sections or tag in task.decision_tags:
+            if phase == "review" and _sent_back(task):
+                return "implementing"
             return phase
     # Legacy: a `## Design` section alone still means planning happened.
     if "design" in task.filled_sections or "orchestrate" in task.decision_tags:

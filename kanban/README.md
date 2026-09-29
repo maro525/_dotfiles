@@ -88,13 +88,26 @@ PR is open and awaiting merge, so they map to **deploy** (where `/orchestrate`
 leaves a finished task); the review phase itself is `reviewing`.
 
 **Evidence** — which process sections hold real content (template comments,
-`N/A`, `未着手` and similar placeholders do not count): `## startproject`,
-`## team-implement`, `## team-review`, `## deploy`. Files written before the
-current layout are still read: the old section names (`## Brief`,
-`## Implementation Notes`, `## Review`) count for the same phases, and so do
-their Decision Log entry prefixes (`- [startproject]`, `- [team-implement]`,
-`- [team-review]`, `- [deploy]`). Those prefixes are matched only at the start
-of a list item; a `[deploy]` mentioned in prose is not evidence that deploy ran.
+`N/A`, `未着手` and similar placeholders do not count, and neither do bare
+headings: a `## startproject` holding only `### Brief / Design / Plan` and
+comments is empty): `## startproject`, `## team-implement`, `## team-review`,
+`## deploy`. Only the `##` heading decides the section; the `### {m}回目` /
+`### 案 {k}` sub-headings and the `利用AI:` / `採用:` lines inside them do not
+move a card. Files written before the current layout are still read: the old
+section names (`## Brief`, `## Implementation Notes`, `## Review`) count for
+the same phases, and so do their Decision Log entry prefixes
+(`- [startproject]`, `- [team-implement]`, `- [team-review]`, `- [deploy]`).
+Those prefixes are matched only at the start of a list item; a `[deploy]`
+mentioned in prose is not evidence that deploy ran.
+
+One cap on evidence: when the latest `### {m}回目` under `## team-review`
+carries a FAIL verdict (`**VERDICT: FAIL**`, `#### 判定: FAIL` and the other
+spellings in use), the task was sent back at Gate 2, so the review content
+counts as evidence of **implementing**, not review. A later `### {m+1}回目`
+with a PASS lifts the cap again; a filled `## deploy` always wins over it. The
+verdict is the last one written under the highest round number, so a second
+AI's PASS on the same round overrides an earlier FAIL. Verdicts and round
+numbers are internal to this classification and are not shown on the card.
 
 **The column** is whichever is further along, with one asymmetry: only
 `declared` may assert `done`. Completion is a claim about intent, and no amount
@@ -153,7 +166,7 @@ understood shows up as a card with a parse error rather than disappearing.
 
 `/api/board` returns one object per card with `phase`, `declaredPhase`,
 `evidencePhase` and `staleStatus`, so the classification is inspectable rather
-than buried.
+than buried. The review verdict that feeds `evidencePhase` is not exposed.
 
 ## Development
 

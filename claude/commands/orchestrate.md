@@ -216,7 +216,7 @@ n と m は独立に数える（差し戻しで m だけ増えることがある
 
 ## STEP 3P: フェーズ指定モード
 
-既存 TASK_FILE の **1 フェーズを 1 つの外部 AI で 1 回**実行し、結果を TASK_FILE に追記する。STEP 4〜6 には合流せず、P1〜P6 を順に実行して STEP 7 の報告で終わる。**`## Meta` の `status:` はこのモードでは一切変えない**（次に何を回すかはユーザーが決める）。並列実行はしない（1 回の呼び出しで 1 フェーズ × 1 AI）。
+既存 TASK_FILE の **1 フェーズを 1 つの外部 AI で 1 回**実行し、結果を TASK_FILE に追記する。STEP 4〜6 には合流せず、P1〜P6 を順に実行して STEP 7 の報告で終わる。**`## Meta` の `status:` は P4 で節の書き込みを確認したあとに、実行したフェーズの値へ更新する**（P4 末尾の表。失敗時は変えない。次に何を回すかはユーザーが決める）。並列実行はしない（1 回の呼び出しで 1 フェーズ × 1 AI）。
 
 ### 引数
 
@@ -235,7 +235,7 @@ n と m は独立に数える（差し戻しで m だけ増えることがある
 - **使った AI は見出しの直下の行**（空行を挟まない）に `利用AI: {label}（{YYYY-MM-DD HH:MM}）` と書く（label は `{ai}/{model}`、model 省略時は `{ai}`。日時は P2 で渡した実行日時）。deploy は `- 作成日時:` / `- 日時:` の行が別にあるので `利用AI: {label}` だけ
 - 同じ回を別の AI でレビューすると `## team-review` に同じ `### {m}回目` が並ぶ。見出しは変えず、区別は `利用AI:` の行で付ける
 - 節の中に「フェーズ指定モードで実行した」「外部 CLI で実行した」といった実行経路の説明は書かない（誰が書いたかは `利用AI:` の行だけで示す）
-- **実行したフェーズの節（`## {phase}`）の外には追記しない。** 例外は team-implement の `## Meta` の `branch:` / `base:` だけ。`status:` は変えない
+- **実行したフェーズの節（`## {phase}`）の外には追記しない。** 例外は team-implement の `## Meta` の `branch:` / `base:` だけ。`status:` は CLI が書かない（orchestrate が P4 で更新する）
 - `--adopt` の採用の印は見出しに付けず、候補の `利用AI:` の行の直後に `採用: {YYYY-MM-DD HH:MM}` の行で書く
 
 ### P1: TASK_FILE を読み、回数と前提を決める
@@ -257,7 +257,7 @@ STEP 3F F1 と同じ場所から `LINEAR_ID` / `tier` / task description / `bran
 | `team-implement` / `team-review` | `### {m}回目`（team-review で同じ見出しが既にあってもそのまま。区別は `利用AI:` の行） | `### {m}回目`（完全一致。`## team-implement` にも同じ見出しがあるので、数えるのは `## {phase}` の節の中だけ） |
 | `deploy` | `#### PR / MR`（既に PR/MR URL があれば `#### 追加 push（…）`） | `#### PR / MR`（完全一致）または `#### 追加 push（`（前方一致） |
 
-`--adopt=案 {k}` のとき: `### 案 {k}` の `#### Brief` / `#### Design` / `#### Plan` の本文を `### Brief` / `### Design` / `### Plan` にコピーし（既存の本文は上書き。`### Plan` 末尾の `#### 追加依頼 {n}` があれば残す）、候補の `利用AI:` 行の直後（無ければ見出しの直後）に `採用: {YYYY-MM-DD HH:MM}` の行を入れて（見出しは変えない。日時は `date '+%Y-%m-%d %H:%M'`）、P2〜P5 を飛ばして P6 へ。ほかの候補に既に `採用:` があってもその行は消さない（日時が新しい方が現行）。該当の候補が無ければ中止して案内する。`## startproject` の外には何も書かない。
+`--adopt=案 {k}` のとき: `### 案 {k}` の `#### Brief` / `#### Design` / `#### Plan` の本文を `### Brief` / `### Design` / `### Plan` にコピーし（既存の本文は上書き。`### Plan` 末尾の `#### 追加依頼 {n}` があれば残す）、候補の `利用AI:` 行の直後（無ければ見出しの直後）に `採用: {YYYY-MM-DD HH:MM}` の行を入れて（見出しは変えない。日時は `date '+%Y-%m-%d %H:%M'`）、P2〜P5 を飛ばして P6 へ。ほかの候補に既に `採用:` があってもその行は消さない（日時が新しい方が現行）。該当の候補が無ければ中止して案内する。`## startproject` の外に書くのは `## Meta` の `status:` を `planning` にすることだけ（P4 末尾の表と同じ）。
 
 ### P2: 呼び出し表を読み、プロンプトを作る
 
@@ -307,7 +307,7 @@ awk -v sec='## {phase}' -v key='{照合キー}' -v prefix=0 '{sub(/[ \t]+$/,"")}
 
 | 結果 | 動作 |
 |---|---|
-| 増えている | そのまま。ただし増えた見出しの直下に `利用AI: {label}…` の行が無ければ、その行を orchestrate が挿入して報告する（「TASK_FILE に書く形」）。`## Meta` の `status:` が変わっていたら元の値に戻し、`## {phase}` の外（例外: team-implement の `branch:` / `base:`）に追記があればユーザーに報告する（自動では消さない） |
+| 増えている | そのまま。ただし増えた見出しの直下に `利用AI: {label}…` の行が無ければ、その行を orchestrate が挿入して報告する（「TASK_FILE に書く形」）。`## Meta` の `status:` は CLI が変えていても下表の値で上書きし、`## {phase}` の外（例外: team-implement の `branch:` / `base:`）に追記があればユーザーに報告する（自動では消さない） |
 | 増えていない | 最終メッセージから `### SECTION` 以下を切り出し（下記「最終メッセージの取り出し」）、`## {phase}` の末尾に追記する（代筆）。見出しは P1 の期待する見出しにし、直下に `利用AI: {label}（{日時}）` の行が無ければ足す。実行経路の説明（「代筆」「フェーズ指定モード」など）は節に書かない。team-implement は `### RESULT` の `branch:` / `base:` を `## Meta` に書く |
 | 節も `### SECTION` も無い | 失敗として報告する |
 | deploy が `pr: 中止（理由）`（`### SECTION` が `### 中止`） | 代筆せず、中止理由をそのまま報告する |
@@ -316,13 +316,22 @@ awk -v sec='## {phase}' -v key='{照合キー}' -v prefix=0 '{sub(/[ \t]+$/,"")}
 
 どのフェーズも CLI が TASK_FILE に直接書くのが原則（`written: yes`）。サンドボックス等で書けなかった（`written: no`）ときだけ代筆になる。
 
+**[MUST]** 節の確認・代筆が済んだら `## Meta` の `status:` を実行したフェーズの値に更新する（通常モードの「状態管理」と同じ語彙。kanban はこの値と節の中身の遠い方で列を決める）。通常モードは STEP 開始時に更新するが、このモードは 1 フェーズ単発で失敗時に TASK_FILE を汚さない原則があるため、成功が確定した P4 の末尾で更新する。失敗（exit ≠ 0 / timeout / 節も `### SECTION` も無い）と deploy の `pr: 中止` では変えない。
+
+| phase | 成功後の `status:` |
+|---|---|
+| `startproject`（`--adopt` も） | `planning` |
+| `team-implement` | `implementing` |
+| `team-review` | `reviewing`（FAIL でも同じ。通常モードの Gate 2 で判断待ちの状態と同じで、次に `--phase=team-implement` を回した時点で `implementing` になる） |
+| `deploy` | `in-review` |
+
 ### P5: 作業ツリーと ref の確認
 
 startproject / team-review は TASK_FILE 以外を変更しない前提（SKILL.md の指示。起動オプションでは強制しない）。P3 のスナップショットと起動後の `git status --porcelain` / `git rev-parse HEAD` / `git branch --show-current` / `git for-each-ref` / `git stash list` を比べ、TASK_FILE 以外の作業ツリーの差分、HEAD・ブランチ・ref・stash の変化があれば「{phase}（{ai}）が TASK_FILE 以外を変更しました: {差分の内容}。内容を確認し、不要なら戻してください」と報告する（自動で戻さない。扱いはユーザーが決める）。簡単な比較なので、変更済みファイルの再編集や push のように見えない変化もある。team-implement / deploy は変更が前提なので比較しない。
 
 ### P6: Linear と報告
 
-`### RESULT` の `linear:` が `未投稿` で LINEAR_ID が実在するなら、書いた節の要約を `mcp__linear-server__save_comment` で LINEAR_ID に投稿する（`posted` なら投稿しない）。**Linear のステータスと `## Meta` の `status:` は変えない。** その後 STEP 7 へ（Mode 行は `フェーズ指定（{phase}、{ai}[:{model}]、{見出し}）`。`--adopt` なら `フェーズ指定（startproject、案 {k} を採用）`）。実行経路の記録は STEP 7 の報告（ユーザー向け）だけで、TASK_FILE には残さない。
+`### RESULT` の `linear:` が `未投稿` で LINEAR_ID が実在するなら、書いた節の要約を `mcp__linear-server__save_comment` で LINEAR_ID に投稿する（`posted` なら投稿しない）。**Linear のステータスは変えない**（`## Meta` の `status:` は P4 で更新済み）。その後 STEP 7 へ（Mode 行は `フェーズ指定（{phase}、{ai}[:{model}]、{見出し}）`。`--adopt` なら `フェーズ指定（startproject、案 {k} を採用）`）。実行経路の記録は STEP 7 の報告（ユーザー向け）だけで、TASK_FILE には残さない。
 
 ## STEP 4: team-implement を実行
 
@@ -367,6 +376,7 @@ team-review は `VERDICT` / `REVIEW` / `LINEAR_COMMENT` を返してくる。
 | OUTPUT セクション | 書き込み先 |
 |---|---|
 | `REVIEW` | `## team-review` に `### {m}回目` として追記 |
+| `VERDICT` | `### {m}回目` の直下に `**VERDICT: PASS**` / `**VERDICT: FAIL**` の 1 行（kanban が Gate 2 差し戻しの判定に使う。`REVIEW` 本文にこの行が含まれていれば重ねて書かない） |
 
 **FAIL の場合も必ず書き込む**（差し戻し履歴を残すため）。Gate 2 で STEP 4 に戻ったら、次の実装・レビューは m+1 回目として追記する（上書きしない）。
 
@@ -413,7 +423,7 @@ deploy はコミット・push・PR / MR 作成（既存の PR / MR があれば�
 
 追加修正モードでは startproject 行を「（追加修正モード: スキップ）」または再設計時の結果にし、deploy 行に既存 PR / MR の URL を書く。
 
-フェーズ指定モードでは実行したフェーズの行だけを書き（書いた見出しと `利用AI:` の値・代筆の有無・`### RESULT` のフェーズ固有行: gate1 / escalation / verdict / pr）、他の行は「（未実行）」にする。`status` は変えていないので、次に回すフェーズと呼び出し例（`/orchestrate "--task-file=… --phase=… --ai=…"` または `--adopt=案 {k}`）を末尾に添える。
+フェーズ指定モードでは実行したフェーズの行だけを書き（書いた見出しと `利用AI:` の値・代筆の有無・`### RESULT` のフェーズ固有行: gate1 / escalation / verdict / pr）、他の行は「（未実行）」にする。`status` は実行したフェーズの値（P4 の表）になっているので、次に回すフェーズと呼び出し例（`/orchestrate "--task-file=… --phase=… --ai=…"` または `--adopt=案 {k}`）を末尾に添える。
 
 ## 状態管理
 
@@ -427,7 +437,7 @@ orchestrator は以下を変数として保持し、全 command に引数で渡�
 
 作業ブランチとその分岐元は、引数ではなく TASK_FILE の `## Meta` の `branch:` / `base:` で受け渡す（STEP 4 で記入。追加修正モードでは既存の値をそのまま使う。フェーズ指定モードの team-implement は外部 CLI が書き、未書き込みなら P4 で代筆する）。
 
-フェーズ指定モード（STEP 3P）は `status` と Linear ステータスを**変えない**。下表は通常・追加修正モードだけに適用する。
+フェーズ指定モード（STEP 3P）は Linear ステータスを**変えず**、`status` は STEP 3P P4 末尾の表で更新する（成功後に、実行したフェーズの値へ）。下表は通常・追加修正モードだけに適用する。
 
 ### TASK_FILE の `status` と Linear ステータス
 
