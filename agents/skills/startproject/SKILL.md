@@ -22,7 +22,7 @@ $ARGUMENTS: "{task description} --task-file={TASK_FILE} [--tier=S|M|L] [--linear
 | `--task-file` | **必須**。存在しなければ「TASK_FILE の新規作成」のテンプレートから作る |
 | `--tier` | 省略時は `## Meta` の `tier:`、それも無ければ S |
 | `--linear-id` | 省略時は `## Meta` の `linear_id:`。無い／`NOLINEAR` なら Linear には投稿しない |
-| `--label` | 書く見出しに付ける実行者名（例 `{ai}/{model}`）。あれば**候補モード**（`### 案 {k}` を追記）、なければ**上書きモード**（`### Brief` / `### Design` / `### Plan` を書く） |
+| `--label` | 実行者名（例 `{ai}/{model}`）。あれば**候補モード**（`### 案 {k}` を追記し、見出しの直下に `利用AI: {label}（{日時}）` を書く）、なければ**上書きモード**（`### Brief` / `### Design` / `### Plan` を書く） |
 
 ### tier の意味
 
@@ -38,14 +38,32 @@ Hard Trigger（DB スキーマ変更・認証認可・決済・公開 API の変
 
 ## 書き込み規約
 
-- 書くのは `## startproject` の中だけ。**`## Meta` の `status:` は絶対に書かない**。`branch:` / `base:` にも触らない
+- 書くのは `## startproject` の中だけ。**`## Meta` の `status:` は絶対に書かない**。`branch:` / `base:` にも触らない。`## startproject` の外には何も追記しない
 - `##` 見出しを増やさない（かんばんが `##` 見出しで列を判定する。`###` 以下は自由）
+- 見出しに実行者名や日時を入れない（`### 案 {k}` のまま）。実行者は見出しの**すぐ下の行**（空行を挟まない）に `利用AI: {label}（{YYYY-MM-DD HH:MM}）` と書く。`--label` が無ければこの行は書かない（自分の名前を推定して書かない）
+- 節の中に「どの経路で・どのツールから実行されたか」の説明は書かない（実行者は `利用AI:` の行だけで示す）
 - 日時は `date '+%Y-%m-%d %H:%M'` の形式。呼び出し元がプロンプトで日時を渡していればその値を使い、無ければ `date` で取る（推定でつくらない）
 
 | モード | 書き方 |
 |---|---|
-| 候補モード（`--label` あり） | `## startproject` の**末尾**に `### 案 {k}（{label}、{YYYY-MM-DD HH:MM}）` を追記し、その下に `#### Brief` / `#### Design` / `#### Plan`。k は既存の `### 案 {k}` の最大 + 1（初回は 1）。既存の `### Brief` / `### Design` / `### Plan` と他の `### 案` には触らない（採用・昇格は呼び出し元が行う） |
+| 候補モード（`--label` あり） | `## startproject` の**末尾**に `### 案 {k}` を追記し、直下に `利用AI: {label}（{YYYY-MM-DD HH:MM}）`、その下に `#### Brief` / `#### Design` / `#### Plan`。k は既存の `### 案 {k}` の最大 + 1（初回は 1）。既存の `### Brief` / `### Design` / `### Plan` と他の `### 案` には触らない（採用・昇格と `採用:` の行は呼び出し元が書く） |
 | 上書きモード（`--label` なし） | `### Brief` / `### Design` / `### Plan` を書く（既にあれば上書き）。既存の `### 案 {k}` は残す |
+
+候補モードの形:
+
+```markdown
+### 案 {k}
+利用AI: {label}（{YYYY-MM-DD HH:MM}）
+
+#### Brief
+…
+
+#### Design
+…
+
+#### Plan
+…
+```
 
 ### TASK_FILE の新規作成
 
@@ -143,7 +161,7 @@ Design に書く内容: **採用した方針とその理由** / **検討して�
 - phase: startproject
 - task_file: {絶対パス}
 - written: yes | no（理由）
-- section: `## startproject` > `### 案 {k}（{label}、{日時}）` または `### Brief / ### Design / ### Plan`
+- section: `## startproject` > `### 案 {k}` または `### Brief / ### Design / ### Plan`
 - linear: posted | 未投稿（理由）
 - gate1: auto-approved | approved | revised | 要確認
 

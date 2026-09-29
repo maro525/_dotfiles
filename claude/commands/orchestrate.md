@@ -51,7 +51,7 @@ $ARGUMENTS を受け取ったら最初にモードを決め、判定結果（モ
 | **追加修正モード** | `--phase` がなく、(a) `--task-file={TASK_FILE}` で既存の `task-*.md` が指定された、または (b) Linear ID を検出し、`.claude/docs/decisions/task-{LINEAR_ID}-*.md` が存在する | STEP 3F |
 
 - (b) で該当ファイルが複数あれば `AskUserQuestion` で選ばせる
-- フェーズ指定モードは、既存 TASK_FILE の 1 フェーズだけを **別の AI（pi / cline / opencode / codex）** で 1 回実行し、結果を次の回・次の候補として TASK_FILE に追記するときに使う。Claude の command は呼ばず、`~/.agents/skills/{phase}/SKILL.md`（一般向けフェーズ定義）を外部 CLI に読ませる。CLI の呼び出し表は dotfiles の `agents/README.md`「外部 CLI のフェーズ実行」（`~/.claude` には同期されないので、読み方は STEP 3P P2）
+- フェーズ指定モードは、既存 TASK_FILE の 1 フェーズだけを **別の AI（pi / cline / opencode / codex）** で 1 回実行し、結果を次の回・次の候補として TASK_FILE に追記するときに使う。Claude の command は呼ばず、`~/.agents/skills/{phase}/SKILL.md`（一般向けフェーズ定義）を外部 CLI に読ませる。CLI の呼び出し表は dotfiles の `agents/README.md`「外部 CLI のフェーズ実行」（`~/.claude` には同期されないので、読み方は STEP 3P P2）。TASK_FILE の見出しは通常モードと同じ（`### {m}回目` / `### 案 {k}`）で、使った AI は見出しの直下の `利用AI:` 行で示す（STEP 3P P1）
 - 呼び出し形: `/orchestrate "--task-file={TASK_FILE} --phase={phase} --ai={pi|cline|opencode|codex}[:{model}]"`、候補の採用は `/orchestrate "--task-file={TASK_FILE} --phase=startproject --adopt=案 {k}"`
 - 追加修正モードは、`/orchestrate` が PR / MR を出したタスクに追加の変更（レビュー指摘への対応、仕様の追加など）を加えるときに使う。既存 PR への追加変更は必ずこのモードを通し、orchestrator が直接編集して push しない（`$HOME/.claude/rules/tool-routing.md` の「/orchestrate で作った PR への追加変更」）
 - 呼び出し形: `/orchestrate "{追加の依頼} --task-file={TASK_FILE}"`（または `/orchestrate "{LINEAR_ID} {追加の依頼}"`）
@@ -227,6 +227,17 @@ n と m は独立に数える（差し戻しで m だけ増えることがある
 | `--ai={ai}[:{model}]` | `--adopt` 以外で必須 | `pi` / `cline` / `opencode` / `codex`。`:{model}` は各 CLI の `--model` にそのまま渡す（変換しない）。Claude の別モデルは対象外 |
 | `--adopt=案 {k}` | 任意 | `--phase=startproject` 専用。CLI を起動せず、候補 `### 案 {k}` を `### Brief / Design / Plan` に昇格させて終わる |
 
+### TASK_FILE に書く形（このモードの規約）
+
+外部 CLI が書く場合も orchestrate が代筆する場合も同じ形にする（一般向け SKILL.md の「書き込み規約」と同じ内容。ここが Claude 側の定義）。
+
+- **見出しは通常モードと同じ。** team-implement / team-review は `### {m}回目`、startproject の候補は `### 案 {k}`、deploy は `#### PR / MR`（追加 push は `#### 追加 push（追加依頼 {n}）`）。見出しに AI 名や日時を入れない
+- **使った AI は見出しの直下の行**（空行を挟まない）に `利用AI: {label}（{YYYY-MM-DD HH:MM}）` と書く（label は `{ai}/{model}`、model 省略時は `{ai}`。日時は P2 で渡した実行日時）。deploy は `- 作成日時:` / `- 日時:` の行が別にあるので `利用AI: {label}` だけ
+- 同じ回を別の AI でレビューすると `## team-review` に同じ `### {m}回目` が並ぶ。見出しは変えず、区別は `利用AI:` の行で付ける
+- 節の中に「フェーズ指定モードで実行した」「外部 CLI で実行した」といった実行経路の説明は書かない（誰が書いたかは `利用AI:` の行だけで示す）
+- **実行したフェーズの節（`## {phase}`）の外には追記しない。** 例外は team-implement の `## Meta` の `branch:` / `base:` だけ。`status:` は変えない
+- `--adopt` の採用の印は見出しに付けず、候補の `利用AI:` の行の直後に `採用: {YYYY-MM-DD HH:MM}` の行で書く
+
 ### P1: TASK_FILE を読み、回数と前提を決める
 
 STEP 3F F1 と同じ場所から `LINEAR_ID` / `tier` / task description / `branch:` / `base:` を復元し、フェーズ別に次を決める。
@@ -238,15 +249,15 @@ STEP 3F F1 と同じ場所から `LINEAR_ID` / `tier` / task description / `bran
 | `team-review` | m = `## team-implement` の最新回の番号（無ければ 1） | `## team-implement` が埋まっている |
 | `deploy` | — | `## team-review` の最新回が PASS、`branch:` が空でない |
 
-ラベルは `--label={ai}/{model}`（model 省略時は `{ai}`）。期待する見出し（P4 の確認に使う。**照合は「照合キー」の前方一致**。日時や括弧の中身は CLI が書くので事前に分からない）:
+ラベルは `--label={ai}/{model}`（model 省略時は `{ai}`）。ラベルは見出しには入らず、見出し直下の `利用AI:` 行になる。期待する見出し（P4 の確認に使う。**照合キーは見出し行そのもの**で、`### …` は完全一致、`#### 追加 push（` だけ前方一致。見出しに AI 名が無いので、同じ見出しが既にあっても区別せず、`## {phase}` の節の中の出現数を P3（起動前）と P4（起動後）で数えて差で判定する）:
 
-| phase | 期待する見出し | 照合キー（前方一致） |
+| phase | 期待する見出し | 照合キー |
 |---|---|---|
-| `startproject` | `### 案 {k}（{label}、{日時}）` | `### 案 {k}（` |
-| `team-implement` / `team-review` | `### {m}回目（{label}）`（team-review で同じ見出しが既にあれば `### {m}回目（{label}、{日時}）`） | `### {m}回目（`（`## team-implement` にも同じ形の見出しがあるので、数えるのは `## {phase}` の節の中だけ。P3 で起動前の数を記録し、P4 で増えたことを確認する） |
-| `deploy` | `### PR / MR`（既に PR/MR URL があれば `#### 追加 push（…）`） | `### PR / MR` または `#### 追加 push（` |
+| `startproject` | `### 案 {k}` | `### 案 {k}`（完全一致） |
+| `team-implement` / `team-review` | `### {m}回目`（team-review で同じ見出しが既にあってもそのまま。区別は `利用AI:` の行） | `### {m}回目`（完全一致。`## team-implement` にも同じ見出しがあるので、数えるのは `## {phase}` の節の中だけ） |
+| `deploy` | `#### PR / MR`（既に PR/MR URL があれば `#### 追加 push（…）`） | `#### PR / MR`（完全一致）または `#### 追加 push（`（前方一致） |
 
-`--adopt=案 {k}` のとき: `### 案 {k}` の `#### Brief` / `#### Design` / `#### Plan` の本文を `### Brief` / `### Design` / `### Plan` にコピーし（既存の本文は上書き。`### Plan` 末尾の `#### 追加依頼 {n}` があれば残す）、候補の見出しに ` — 採用` を付けて（`### 案 {k}（{label}、{日時}） — 採用`）、P2〜P5 を飛ばして P6 へ。該当の候補が無ければ中止して案内する。
+`--adopt=案 {k}` のとき: `### 案 {k}` の `#### Brief` / `#### Design` / `#### Plan` の本文を `### Brief` / `### Design` / `### Plan` にコピーし（既存の本文は上書き。`### Plan` 末尾の `#### 追加依頼 {n}` があれば残す）、候補の `利用AI:` 行の直後（無ければ見出しの直後）に `採用: {YYYY-MM-DD HH:MM}` の行を入れて（見出しは変えない。日時は `date '+%Y-%m-%d %H:%M'`）、P2〜P5 を飛ばして P6 へ。ほかの候補に既に `採用:` があってもその行は消さない（日時が新しい方が現行）。該当の候補が無ければ中止して案内する。`## startproject` の外には何も書かない。
 
 ### P2: 呼び出し表を読み、プロンプトを作る
 
@@ -277,7 +288,7 @@ Work in {リポジトリの絶対パス}. End your final message with the `### R
 呼び出し表は P2 で読んだ `{DOTFILES}/agents/README.md` の「外部 CLI のフェーズ実行 › 呼び出し表」（起動オプションの唯一の定義。ここには書かない）。**全フェーズ同じ起動オプション**で、確認なしで編集・コマンド実行を許す（読み取り専用にしない。Gate 1 / Gate 2 でユーザー了承済み。理由は同節の「権限」）。
 
 - startproject / team-review では、起動前にスナップショットを `.claude/logs/phase-{phase}-{ai}-{YYYYMMDD-HHMM}.before.txt` に残す（P5 で比較）: `git status --porcelain`、`git rev-parse HEAD`、`git branch --show-current`、`git for-each-ref`、`git stash list`
-- 全フェーズで、P4 用に `## {phase}` の節の中の照合キーの出現数を**常に**数えて記録する（P4 のコマンド）
+- 全フェーズで、P4 用に `## {phase}` の節の中の照合キー（見出し行）の出現数を**常に**数えて記録する（P4 のコマンド。同じ見出しが既に並んでいても差で判定できる）
 - `--ai=codex` は呼び出し表のとおり `-o {last}` で最終メッセージを `.claude/logs/phase-{phase}-{ai}-{YYYYMMDD-HHMM}.last.md` に書かせる（サンドボックスのオプションも表に従う。ここで変えない）
 - 起動は **background Bash** で `timeout -k 1m 30m {cli …} "$(cat {prompt_file})" < /dev/null > {log_file} 2>&1`（`log_file` は `.claude/logs/phase-{phase}-{ai}-{YYYYMMDD-HHMM}.log`）。`< /dev/null` を外さない（stdin が開いたままだとハングする CLI がある）。`2>/dev/null` は付けない
 - **完了通知が来るまで次に進まない。** `pgrep` やログの先読みで完了を推測しない
@@ -285,18 +296,19 @@ Work in {リポジトリの絶対パス}. End your final message with the `### R
 
 ### P4: TASK_FILE を確認し、未書き込みなら代筆する
 
-**[MUST]** TASK_FILE の **`## {phase}` の節の中だけ**を対象に、P1 の照合キーで始まる見出し行を数え、P3 で記録した起動前の数より増えたかで判定する（日時・括弧の中身は照合しない。`### {m}回目（` は `## team-implement` にも現れるので、ファイル全体を `grep -c` しない）:
+**[MUST]** TASK_FILE の **`## {phase}` の節の中だけ**を対象に、P1 の照合キーと一致する見出し行を数え、P3 で記録した起動前の数より増えたかで判定する（見出しに AI 名は無いので、同じ見出しが何本並んでいても差で判定する。`### {m}回目` は `## team-implement` にも現れるので、ファイル全体を `grep -c` しない）:
 
 ````bash
-awk -v sec='## {phase}' -v key='{照合キー}' '/^```/{fence=!fence; next} fence{next} /^## /{f=($0==sec)} f && index($0,key)==1' {TASK_FILE} | wc -l
+# prefix=0: 見出し行と完全一致（### 案 {k} / ### {m}回目 / #### PR / MR）、prefix=1: 前方一致（#### 追加 push（）
+awk -v sec='## {phase}' -v key='{照合キー}' -v prefix=0 '{sub(/[ \t]+$/,"")} /^```/{fence=!fence; next} fence{next} /^## /{f=($0==sec)} f && (prefix ? index($0,key)==1 : $0==key)' {TASK_FILE} | wc -l
 ````
 
 コードブロック（```` ``` ```` で囲まれた範囲）の中の `## ` / `### ` 行は節の切り替えにも数にも入れない（節の本文にコマンド例や見出しの例が引用されていることがある）。起動前後の値の差が 1 以上なら「増えている」。
 
 | 結果 | 動作 |
 |---|---|
-| 増えている | そのまま（`## Meta` の `status:` が変わっていたら元の値に戻し、ユーザーに報告する） |
-| 増えていない | 最終メッセージから `### SECTION` 以下を切り出し（下記「最終メッセージの取り出し」）、`## {phase}` の末尾に追記する（代筆）。team-implement は `### RESULT` の `branch:` / `base:` を `## Meta` に書く。startproject の `--label` なしは無いので `### 案 {k}` として追記する |
+| 増えている | そのまま。ただし増えた見出しの直下に `利用AI: {label}…` の行が無ければ、その行を orchestrate が挿入して報告する（「TASK_FILE に書く形」）。`## Meta` の `status:` が変わっていたら元の値に戻し、`## {phase}` の外（例外: team-implement の `branch:` / `base:`）に追記があればユーザーに報告する（自動では消さない） |
+| 増えていない | 最終メッセージから `### SECTION` 以下を切り出し（下記「最終メッセージの取り出し」）、`## {phase}` の末尾に追記する（代筆）。見出しは P1 の期待する見出しにし、直下に `利用AI: {label}（{日時}）` の行が無ければ足す。実行経路の説明（「代筆」「フェーズ指定モード」など）は節に書かない。team-implement は `### RESULT` の `branch:` / `base:` を `## Meta` に書く |
 | 節も `### SECTION` も無い | 失敗として報告する |
 | deploy が `pr: 中止（理由）`（`### SECTION` が `### 中止`） | 代筆せず、中止理由をそのまま報告する |
 
@@ -310,7 +322,7 @@ startproject / team-review は TASK_FILE 以外を変更しない前提（SKILL.
 
 ### P6: Linear と報告
 
-`### RESULT` の `linear:` が `未投稿` で LINEAR_ID が実在するなら、書いた節の要約を `mcp__linear-server__save_comment` で LINEAR_ID に投稿する（`posted` なら投稿しない）。**Linear のステータスと `## Meta` の `status:` は変えない。** その後 STEP 7 へ（Mode 行は `フェーズ指定（{phase}、{ai}[:{model}]、{見出し}）`。`--adopt` なら `フェーズ指定（startproject、案 {k} を採用）`）。
+`### RESULT` の `linear:` が `未投稿` で LINEAR_ID が実在するなら、書いた節の要約を `mcp__linear-server__save_comment` で LINEAR_ID に投稿する（`posted` なら投稿しない）。**Linear のステータスと `## Meta` の `status:` は変えない。** その後 STEP 7 へ（Mode 行は `フェーズ指定（{phase}、{ai}[:{model}]、{見出し}）`。`--adopt` なら `フェーズ指定（startproject、案 {k} を採用）`）。実行経路の記録は STEP 7 の報告（ユーザー向け）だけで、TASK_FILE には残さない。
 
 ## STEP 4: team-implement を実行
 
@@ -401,7 +413,7 @@ deploy はコミット・push・PR / MR 作成（既存の PR / MR があれば�
 
 追加修正モードでは startproject 行を「（追加修正モード: スキップ）」または再設計時の結果にし、deploy 行に既存 PR / MR の URL を書く。
 
-フェーズ指定モードでは実行したフェーズの行だけを書き（書いた見出し・代筆の有無・`### RESULT` のフェーズ固有行: gate1 / escalation / verdict / pr）、他の行は「（未実行）」にする。`status` は変えていないので、次に回すフェーズと呼び出し例（`/orchestrate "--task-file=… --phase=… --ai=…"` または `--adopt=案 {k}`）を末尾に添える。
+フェーズ指定モードでは実行したフェーズの行だけを書き（書いた見出しと `利用AI:` の値・代筆の有無・`### RESULT` のフェーズ固有行: gate1 / escalation / verdict / pr）、他の行は「（未実行）」にする。`status` は変えていないので、次に回すフェーズと呼び出し例（`/orchestrate "--task-file=… --phase=… --ai=…"` または `--adopt=案 {k}`）を末尾に添える。
 
 ## 状態管理
 

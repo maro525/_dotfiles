@@ -22,13 +22,15 @@ $ARGUMENTS: "{task description} --task-file={TASK_FILE} [--tier=S|M|L] [--linear
 | `--task-file` | **必須**。存在しなければ中止して報告する（計画フェーズが先） |
 | `--tier` | 省略時は `## Meta` の `tier:`、それも無ければ S |
 | `--linear-id` | 省略時は `## Meta` の `linear_id:`。無い／`NOLINEAR` なら Linear には投稿しない |
-| `--label` | 書く見出しに付ける実行者名（例 `{ai}/{model}`）。直接呼ぶときは省略可 |
+| `--label` | 実行者名（例 `{ai}/{model}`）。見出しの直下の `利用AI:` 行に書く。直接呼ぶときは省略可 |
 
 ## 書き込み規約
 
-- 書くのは `## team-implement` と、`## Meta` の `branch:` / `base:` だけ。**`## Meta` の `status:` は絶対に書かない**
+- 書くのは `## team-implement` と、`## Meta` の `branch:` / `base:` だけ。**`## Meta` の `status:` は絶対に書かない**。それ以外の場所には何も追記しない
 - `##` 見出しを増やさない（かんばんが `##` 見出しで列を判定する。`###` 以下は自由）
-- `## team-implement` の**末尾**に `### {m}回目（{label}）`（`--label` なしなら `### {m}回目`）を追記する。m は既存の `### {m}回目` の最大 + 1（初回は 1）。追加依頼の番号 `{n}` とは別に数える
+- `## team-implement` の**末尾**に `### {m}回目` を追記する。見出しに実行者名や日時を入れない。m は既存の `### {m}回目` の最大 + 1（初回は 1）。追加依頼の番号 `{n}` とは別に数える
+- `--label` があれば見出しの**すぐ下の行**（空行を挟まない）に `利用AI: {label}（{YYYY-MM-DD HH:MM}）` を書く。無ければこの行は書かない（自分の名前を推定して書かない）
+- 節の中に「どの経路で・どのツールから実行されたか」の説明は書かない（実行者は `利用AI:` の行だけで示す）
 - 既存の回は上書きしない
 - 日時は `date '+%Y-%m-%d %H:%M'` の形式。呼び出し元がプロンプトで日時を渡していればその値を使い、無ければ `date` で取る（推定でつくらない）
 
@@ -97,7 +99,8 @@ Plan のタスクがすべて完了し、テストがすべて通過したら書
 **[MUST]** `## team-implement` の末尾に今回の回を追記し、`## Meta` の `branch:` に作業ブランチ、`base:` に分岐元を記入する（差し戻し・追加修正では既存の `base:` をそのまま残す）。
 
 ```markdown
-### {m}回目（{label}）
+### {m}回目
+利用AI: {label}（{YYYY-MM-DD HH:MM}）
 
 #### 実装サマリー
 - 実装したモジュール・ファイル一覧
@@ -132,7 +135,7 @@ Linear 連携ツールがあれば、LINEAR_ID に実装完了コメント（実
 - phase: team-implement
 - task_file: {絶対パス}
 - written: yes | no（理由）
-- section: `## team-implement` > `### {m}回目（{label}）`
+- section: `## team-implement` > `### {m}回目`
 - linear: posted | 未投稿（理由）
 - branch: {branch}
 - base: {base}

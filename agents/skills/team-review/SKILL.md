@@ -23,13 +23,15 @@ $ARGUMENTS: "{task description} --task-file={TASK_FILE} [--tier=S|M|L] [--linear
 | `--task-file` | **必須。** 無ければ中止して報告する |
 | `--tier` | 省略時は `## Meta` の `tier:`、それも無ければ S |
 | `--linear-id` | 省略時は `## Meta` の `linear_id:`。無い／`NOLINEAR` なら Linear には投稿しない |
-| `--label` | 書く見出しに付ける実行者名（例 `{ai}/{model}`）。呼び出し元が付ける。直接呼ぶときは省略可 |
+| `--label` | 実行者名（例 `{ai}/{model}`）。見出しの直下の `利用AI:` 行に書く。呼び出し元が付ける。直接呼ぶときは省略可 |
 
 ## 書き込み規約
 
-- 書くのは `## team-review` の節だけ。`## Meta` の `status:` は**絶対に書かない**。`##` 見出しは増やさない（kanban が `##` 見出しで列を判定する。`###` 以下は自由）
+- 書くのは `## team-review` の節だけ。`## Meta` の `status:` は**絶対に書かない**。`##` 見出しは増やさない（kanban が `##` 見出しで列を判定する。`###` 以下は自由）。`## team-review` の外には何も追記しない
 - 既存の回は上書きしない。`## team-review` の**末尾**に追記する
-- 見出しは `### {m}回目（{label}）`（`--label` なしなら `### {m}回目`）。`{m}` は `## team-implement` の最新回の番号（無ければ 1）。同じ m を別の実行者が再レビューしてよい（label で区別）。同一見出しが既にあれば `### {m}回目（{label}、{YYYY-MM-DD HH:MM}）` にして区別する
+- 見出しは `### {m}回目`。見出しに実行者名や日時を入れない。`{m}` は `## team-implement` の最新回の番号（無ければ 1）。同じ m を別の実行者が再レビューしてよく、同じ見出しが既にあってもそのまま並べる（区別は次の `利用AI:` の行で付ける）
+- `--label` があれば見出しの**すぐ下の行**（空行を挟まない）に `利用AI: {label}（{YYYY-MM-DD HH:MM}）` を書く。無ければこの行は書かない（自分の名前を推定して書かない）
+- 節の中に「どの経路で・どのツールから実行されたか」の説明は書かない（実行者は `利用AI:` の行だけで示す）
 - **FAIL でも必ず書く**（差し戻し履歴を残すため）
 - 日時は `date '+%Y-%m-%d %H:%M'` の形式。呼び出し元がプロンプトで日時を渡していればその値を使い、無ければ `date` で取る（推定でつくらない）
 
@@ -145,7 +147,8 @@ git diff                           # 追跡済みファイルの差分。未追�
 **[MUST]** TASK_FILE の `## team-review` の末尾に以下を追記する（FAIL でも必ず書く）。
 
 ```markdown
-### {m}回目（{label}）
+### {m}回目
+利用AI: {label}（{YYYY-MM-DD HH:MM}）
 
 #### 判定: PASS / FAIL
 
@@ -200,7 +203,7 @@ git diff                           # 追跡済みファイルの差分。未追�
 - phase: team-review
 - task_file: {絶対パス}
 - written: yes | no（理由）
-- section: `## team-review` > `### {書いた見出し}`
+- section: `## team-review` > `### {m}回目`
 - linear: posted | 未投稿（理由）
 - verdict: PASS | FAIL
 
