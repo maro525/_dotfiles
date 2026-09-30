@@ -208,13 +208,13 @@ TASK_FILE は読むだけで書かない。履歴書き換え（force push / reb
 
 TASK_FILE 以外がコミットに混ざるなら止める。判定はインデックスの中身で行う（作業ツリーに未ステージの無関係な変更があるだけでは止めない。STEP 1 と同じく無関係な変更が作業ツリーに常在する前提）。
 
-**パスの照合:** `git diff --cached --name-only` はリポジトリルート基準の相対パスを返し、TASK_FILE は絶対パスで渡ることが多い。文字列をそのまま比べず、`:(exclude)` で「TASK_FILE 以外に何も無い」ことを見る（`:(exclude)` には絶対パスも相対パスも渡せる）。
+**パスの照合:** `git diff --cached --name-only` はリポジトリルート基準の相対パスを返し、TASK_FILE は絶対パスで渡ることが多い。文字列をそのまま比べず、`:(exclude)` で「TASK_FILE 以外に何も無い」ことを見る（`:(exclude)` には絶対パスも相対パスも渡せる）。範囲を指す pathspec は `.` ではなく `:/`（リポジトリルート。`:(top)` と同じ）にする。`.` は cwd 基準なのでサブディレクトリから実行すると範囲が狭まり、外にある混入を見落とす。
 
 ```bash
 git diff --cached --name-only                                  # 空でなければ中止（他ファイルがステージ済み）
 git add -- {TASK_FILE}
 git diff --cached --name-only                                  # 空 → 差分なし（コミットせず F-4 へ）
-git diff --cached --name-only -- . ":(exclude){TASK_FILE}"     # 空でなければ TASK_FILE 以外が混ざっている → 下記で中止
+git diff --cached --name-only -- ":/" ":(exclude){TASK_FILE}"  # 空でなければ TASK_FILE 以外が混ざっている → 下記で中止（:/ = リポジトリ全体。cwd に依存しない）
 git restore --staged -- {TASK_FILE}                            # 中止時だけ実行（ステージを元に戻す）
 git commit -m "{message}"                                      # -a / add -A は使わない
 ```

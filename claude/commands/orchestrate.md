@@ -157,7 +157,7 @@ startproject は `agent: Plan` の読み取り専用コマンド。`BRIEF` / `DE
 
 n と m は独立に数える（差し戻しで m だけ増えることがある）。
 
-**TASK_FILE が作業ツリーに無い場合**（tracked リポジトリでは STEP 6c 後、PR がマージされるまで TASK_FILE は作業ブランチにしか無い。モード判定 (a) の履歴探しから来た場合もここ）: `git log --all --format=%H -1 -- {TASK_FILE}` でコミットを見つけ、`git branch -a --contains {hash}` で作業ブランチを特定し、`/deploy "git switch {branch}"`（Ad-hoc Git モード。`switch` はガード対象外）で切り替えてから読む。`git branch -a --contains` は `remotes/origin/{branch}` の形でも返すので、`switch` には `remotes/origin/` を除いたローカル名を渡す（ローカルに無ければ `git switch` がリモート追跡ブランチから作る）。複数のブランチが返れば `## Meta` の `branch:` と一致するものを選び、見つからなければ中止して案内する。
+**TASK_FILE が作業ツリーに無い場合**（tracked リポジトリでは STEP 6c 後、PR がマージされるまで TASK_FILE は作業ブランチにしか無い。モード判定 (a) の履歴探しから来た場合もここ）: `git log --all --format=%H -1 -- {TASK_FILE}` でコミットを見つけ、`git branch -a --contains {hash}` で作業ブランチを特定し、`/deploy "git switch {branch}"`（Ad-hoc Git モード。`switch` はガード対象外）で切り替えてから読む。`git branch -a --contains` は `remotes/origin/{branch}` の形でも返すので、`switch` には `remotes/origin/` を除いたローカル名を渡す（ローカルに無ければ `git switch` がリモート追跡ブランチから作る）。複数のブランチが返れば（起きやすいのは PR マージ後に分岐元を pull していないとき: 作業ブランチと `remotes/origin/main` の両方が返る）`## Meta` の `branch:` と一致するものを選ぶ。この時点では TASK_FILE が作業ツリーに無いので、`## Meta` は `git show {hash}:{TASK_FILE のリポジトリルート基準の相対パス}` で読む（例: `git show {hash}:.claude/docs/decisions/task-{LINEAR_ID}-….md`。`{rev}:{path}` の path に絶対パスは渡せない）。見つからなければ中止して案内する。
 
 ### F2: 前提確認
 
@@ -227,7 +227,7 @@ n と m は独立に数える（差し戻しで m だけ増えることがある
 
 | 引数 | 必須 | 意味 |
 |---|---|---|
-| `--task-file={TASK_FILE}` | 必須 | 既存の `task-*.md`。無ければ中止して案内する（新規タスクは通常モード） |
+| `--task-file={TASK_FILE}` | 必須 | 既存の `task-*.md`。作業ツリーに無ければ P1 の手順で履歴から作業ブランチに移って読む。作業ツリーにも履歴にも無ければ中止して案内する（新規タスクは通常モード） |
 | `--phase={phase}` | 必須 | `startproject` / `team-implement` / `team-review` / `deploy` |
 | `--ai={ai}[:{model}]` | `--adopt` 以外で必須 | `pi` / `cline` / `opencode` / `codex`。`:{model}` は各 CLI の `--model` にそのまま渡す（変換しない）。Claude の別モデルは対象外 |
 | `--adopt=案 {k}` | 任意 | `--phase=startproject` 専用。CLI を起動せず、候補 `### 案 {k}` を `### Brief / Design / Plan` に昇格させて終わる |
@@ -449,6 +449,8 @@ deploy 行には PR / MR の URL に加えて 6c の `FINALIZE` の結果（`doc
 追加修正モードでは startproject 行を「（追加修正モード: スキップ）」または再設計時の結果にし、deploy 行に既存 PR / MR の URL を書く。
 
 フェーズ指定モードでは実行したフェーズの行だけを書き（書いた見出しと `利用AI:` の値・代筆の有無・`### RESULT` のフェーズ固有行: gate1 / escalation / verdict / pr。deploy は P7 の `FINALIZE` の結果と現在のブランチも添える。P7 を飛ばしたときは作業ブランチに留まっている旨を書く）、他の行は「（未実行）」にする。`status` は変えていないので、次に回すフェーズと呼び出し例（`/orchestrate "--task-file=… --phase=… --ai=…"` または `--adopt=案 {k}`）を末尾に添える。
+
+deploy 以外のフェーズ（startproject / team-implement / team-review）を 6c の後に回した場合、P1 のガードで作業ブランチに移ってから TASK_FILE に追記するので、**追記は未コミットのまま作業ブランチに残る**（P7 は `--phase=deploy` だけ）。この場合は「現在のブランチ」に加えて、回収方法として `/deploy "--finalize --task-file={TASK_FILE} --linear-id={LINEAR_ID}"` を単独で実行すれば `docs(task):` でコミット・push して分岐元に戻れる旨を報告に添える（次に deploy フェーズを回すなら、その P7 でまとめてコミットされるので急いで回収しなくてもよい）。
 
 ## 状態管理
 
