@@ -31,7 +31,7 @@ $ARGUMENTS の形式: "{task description}"
 - Linear への投稿・ステータス変更に失敗したら、黙って飛ばさずユーザーに報告する
 - orchestrate はメインのセッションで動き、各 command は fork（バックグラウンド）で動く。command を起動したら**完了通知で返却を受け取るまで次の手順に進まない**
 - 各 command は TASK_FILE への書き込みと Linear への投稿をしない（startproject は Write / Edit を持たない）。OUTPUT フォーマットで返却するので、**書き込みと Linear 投稿は orchestrator が行う**。返却が OUTPUT フォーマットに従っていなければ、command に整形し直させてから書き込む
-- git は `$HOME/.claude/rules/tool-routing.md` の「Git Operations」に従う
+- git は `$HOME/.claude/rules/tool-routing.md` の「Git Operations」に従う。deploy は 6a（`/deploy`: コード commit → push → PR / MR。作業ブランチに留まる）→ 6b（orchestrator が作業ブランチ上で `## deploy` と `status: in-review` を書く）→ 6c（`/deploy --finalize`: TASK_FILE だけを `docs(task):` でコミット・push して分岐元へ戻る）の 3 段で、TASK_FILE の記録が分岐元に未コミットで取り残されないようにする
 
 **原則として止まるのは以下の Gate のみ。** ただし各 command が途中でユーザーに確認を求めた場合（startproject の要件ヒアリングなど）は、それに従う。
 
@@ -50,6 +50,9 @@ $ARGUMENTS を受け取ったら最初にモードを決め、判定結果（モ
 | **フェーズ指定モード** | `--phase={startproject\|team-implement\|team-review\|deploy}` がある（`--task-file` 必須） | STEP 3P |
 | **追加修正モード** | `--phase` がなく、(a) `--task-file={TASK_FILE}` で既存の `task-*.md` が指定された、または (b) Linear ID を検出し、`.claude/docs/decisions/task-{LINEAR_ID}-*.md` が存在する | STEP 3F |
 
+- (a) / (b) の存在確認は作業ツリーで行い、無ければ git の履歴でも探す（tracked リポジトリでは STEP 6c 後、PR がマージされるまで TASK_FILE は作業ブランチにしか無く、分岐元の作業ツリーには無い。切り替えは STEP 3F F1）
+  - (a): `git log --all --format=%H -1 -- {TASK_FILE}` がコミットを返せば「既存の `task-*.md`」とみなして追加修正モードにし、F1 の「TASK_FILE が作業ツリーに無い場合」の切り替えへ進む。作業ツリーにも履歴にも無ければ、通常モードに落とさず中止して案内する（パスの誤りか、別のリポジトリ）
+  - (b): `git log --all --name-only --format= -- '.claude/docs/decisions/task-{LINEAR_ID}-*.md'` で作業ブランチにだけある TASK_FILE も探す
 - (b) で該当ファイルが複数あれば `AskUserQuestion` で選ばせる
 - フェーズ指定モードは、既存 TASK_FILE の 1 フェーズだけを **別の AI（pi / cline / opencode / codex）** で 1 回実行し、結果を次の回・次の候補として TASK_FILE に追記するときに使う。Claude の command は呼ばず、`~/.agents/skills/{phase}/SKILL.md`（一般向けフェーズ定義）を外部 CLI に読ませる。CLI の呼び出し表は dotfiles の `agents/README.md`「外部 CLI のフェーズ実行」（`~/.claude` には同期されないので、読み方は STEP 3P P2）。TASK_FILE の見出しは通常モードと同じ（`### {m}回目` / `### 案 {k}`）で、使った AI は見出しの直下の `利用AI:` 行で示す（STEP 3P P1）
 - 呼び出し形: `/orchestrate "--task-file={TASK_FILE} --phase={phase} --ai={pi|cline|opencode|codex}[:{model}]"`、候補の採用は `/orchestrate "--task-file={TASK_FILE} --phase=startproject --adopt=案 {k}"`
@@ -154,6 +157,8 @@ startproject は `agent: Plan` の読み取り専用コマンド。`BRIEF` / `DE
 
 n と m は独立に数える（差し戻しで m だけ増えることがある）。
 
+**TASK_FILE が作業ツリーに無い場合**（tracked リポジトリでは STEP 6c 後、PR がマージされるまで TASK_FILE は作業ブランチにしか無い。モード判定 (a) の履歴探しから来た場合もここ）: `git log --all --format=%H -1 -- {TASK_FILE}` でコミットを見つけ、`git branch -a --contains {hash}` で作業ブランチを特定し、`/deploy "git switch {branch}"`（Ad-hoc Git モード。`switch` はガード対象外）で切り替えてから読む。`git branch -a --contains` は `remotes/origin/{branch}` の形でも返すので、`switch` には `remotes/origin/` を除いたローカル名を渡す（ローカルに無ければ `git switch` がリモート追跡ブランチから作る）。複数のブランチが返れば `## Meta` の `branch:` と一致するものを選び、見つからなければ中止して案内する。
+
 ### F2: 前提確認
 
 以下をすべて満たすときだけ続行する。読み取り系なので orchestrator が直接実行してよい。
@@ -210,13 +215,13 @@ n と m は独立に数える（差し戻しで m だけ増えることがある
 
 ### F5: STEP 4 へ
 
-「状態管理」に従い `status` を `implementing` に戻し、Linear を "In Progress" にして STEP 4 を実行する。STEP 4 → 5 → 6 → 7 は通常モードと同じ（実装・レビューは `{m}回目` として追記。STEP 6 は既存 PR / MR へ追加 push する。Gate 2 の差し戻しも同じ）。
+「状態管理」に従い `status` を `implementing` に戻し、Linear を "In Progress" にして STEP 4 を実行する。STEP 4 → 5 → 6 → 7 は通常モードと同じ（実装・レビューは `{m}回目` として追記。STEP 6 は 6a で既存 PR / MR へ追加 push し、6b で `#### 追加 push（追加依頼 {n}）` を `## deploy` の末尾に追記して `in-review` に戻し、6c でその記録を `docs(task):` として同じブランチに push する。Gate 2 の差し戻しも同じ）。
 
-> **kanban の副作用:** `## deploy` が埋まった TASK_FILE の `status` を `implementing` に戻すため、追加修正中は kanban が deploy 列に stale（status が古い）として表示する。仕様として許容する。STEP 7 で `in-review` に戻ると解消する。
+> **kanban の副作用:** `## deploy` が埋まった TASK_FILE の `status` を `implementing` に戻すため、追加修正中は kanban が deploy 列に stale（status が古い）として表示する。仕様として許容する。STEP 6b で `in-review` に戻ると解消する。また tracked リポジトリでは 6c 後、分岐元を checkout している間は TASK_FILE が作業ツリーに無く kanban に表示されない（PR マージ後に表示される）。これも仕様として許容する。
 
 ## STEP 3P: フェーズ指定モード
 
-既存 TASK_FILE の **1 フェーズを 1 つの外部 AI で 1 回**実行し、結果を TASK_FILE に追記する。STEP 4〜6 には合流せず、P1〜P6 を順に実行して STEP 7 の報告で終わる。**`## Meta` の `status:` はこのモードでは一切変えない**（次に何を回すかはユーザーが決める）。並列実行はしない（1 回の呼び出しで 1 フェーズ × 1 AI）。
+既存 TASK_FILE の **1 フェーズを 1 つの外部 AI で 1 回**実行し、結果を TASK_FILE に追記する。STEP 4〜6 には合流せず、P1〜P7 を順に実行して STEP 7 の報告で終わる（P7 は `--phase=deploy` だけ）。**`## Meta` の `status:` はこのモードでは一切変えない**（次に何を回すかはユーザーが決める）。並列実行はしない（1 回の呼び出しで 1 フェーズ × 1 AI）。
 
 ### 引数
 
@@ -240,7 +245,7 @@ n と m は独立に数える（差し戻しで m だけ増えることがある
 
 ### P1: TASK_FILE を読み、回数と前提を決める
 
-STEP 3F F1 と同じ場所から `LINEAR_ID` / `tier` / task description / `branch:` / `base:` を復元し、フェーズ別に次を決める。
+STEP 3F F1 と同じ場所から `LINEAR_ID` / `tier` / task description / `branch:` / `base:` を復元し、フェーズ別に次を決める。TASK_FILE が作業ツリーに無ければ F1 と同じ手順（`git log --all` でコミットを見つけ、`git branch -a --contains` の結果から `remotes/origin/` を除いたローカル名で `/deploy "git switch {branch}"`）で作業ブランチに移ってから読む。
 
 | phase | 決めるもの | 前提（満たさなければ中止して案内） |
 |---|---|---|
@@ -322,7 +327,19 @@ startproject / team-review は TASK_FILE 以外を変更しない前提（SKILL.
 
 ### P6: Linear と報告
 
-`### RESULT` の `linear:` が `未投稿` で LINEAR_ID が実在するなら、書いた節の要約を `mcp__linear-server__save_comment` で LINEAR_ID に投稿する（`posted` なら投稿しない）。**Linear のステータスと `## Meta` の `status:` は変えない。** その後 STEP 7 へ（Mode 行は `フェーズ指定（{phase}、{ai}[:{model}]、{見出し}）`。`--adopt` なら `フェーズ指定（startproject、案 {k} を採用）`）。実行経路の記録は STEP 7 の報告（ユーザー向け）だけで、TASK_FILE には残さない。
+`### RESULT` の `linear:` が `未投稿` で LINEAR_ID が実在するなら、書いた節の要約を `mcp__linear-server__save_comment` で LINEAR_ID に投稿する（`posted` なら投稿しない）。**Linear のステータスと `## Meta` の `status:` は変えない。** その後 P7（`--phase=deploy` のみ。それ以外は飛ばす）→ STEP 7 へ（Mode 行は `フェーズ指定（{phase}、{ai}[:{model}]、{見出し}）`。`--adopt` なら `フェーズ指定（startproject、案 {k} を採用）`）。実行経路の記録は STEP 7 の報告（ユーザー向け）だけで、TASK_FILE には残さない。
+
+### P7: deploy の finalize
+
+`--phase=deploy` で `### RESULT` の `pr:` が URL のときだけ（`中止（…）` なら飛ばす）、P6 の後に実行する。外部 CLI の deploy は分岐元に戻らず作業ブランチに留まる（一般向け SKILL.md は TASK_FILE をコミットしない）ので、P4 で確定した記録（`利用AI:` 行・代筆分を含む）を `/deploy` の Finalize モードで同じブランチに push してから分岐元に戻す:
+
+```
+/deploy "--finalize --task-file={TASK_FILE} --linear-id={LINEAR_ID}"
+```
+
+`FINALIZE` の返却は TASK_FILE に書かず、STEP 7 の deploy 行に添える。`- 中止:` があれば理由をそのまま報告する（作業ブランチに残った変更はそのまま）。`status:` はこのモードでは変えない（P6 のとおり）。
+
+P7 を飛ばしたとき（`pr: 中止（…）`）や中止したときは、外部 CLI が留まった**作業ブランチのまま**で終わる（分岐元には戻らない）。STEP 7 で現在のブランチを示す。
 
 ## STEP 4: team-implement を実行
 
@@ -376,13 +393,17 @@ team-review は `VERDICT` / `REVIEW` / `LINEAR_COMMENT` を返してくる。
 
 ## STEP 6: deploy を実行
 
-**完了次第即 STEP 7 へ進む。**
+6a → 6b → 6c を順に実行し、**完了次第即 STEP 7 へ進む。** deploy 後の TASK_FILE の記録（`## deploy`・`status: in-review`）を作業ブランチ上でコミット・push してから分岐元に戻るための 3 段構造（6a の後は作業ブランチに留まっている）。
+
+### 6a: `/deploy`（コード commit → push → PR / MR）
 
 ```
 /deploy "{task description} --tier={tier} --task-file={TASK_FILE} --linear-id={LINEAR_ID}"
 ```
 
-deploy はコミット・push・PR / MR 作成（既存の PR / MR があれば追加 push と本文追記）のみ行い、`DEPLOY` / `LINEAR_COMMENT` を返してくる。
+deploy はコミット・push・PR / MR 作成（既存の PR / MR があれば追加 push と本文追記）のみ行い、`DEPLOY` / `LINEAR_COMMENT` を返してくる。**分岐元には戻らず作業ブランチに留まる**（TASK_FILE 自体はコードのコミットに含めない）。
+
+### 6b: TASK_FILE への記録と Linear（作業ブランチ上）
 
 **[MUST]** 返却内容を TASK_FILE に書き込む:
 
@@ -390,7 +411,19 @@ deploy はコミット・push・PR / MR 作成（既存の PR / MR があれば�
 |---|---|
 | `DEPLOY` | `## deploy`。**追加修正モードでは上書きせず**、返却の `#### 追加 push（追加依頼 {n}）` を `## deploy` の末尾に追記する |
 
-**[MUST]** `LINEAR_COMMENT` を投稿し、Linear のステータスを「状態管理」に従って変更する。
+**[MUST]** 同時に「状態管理」に従い `## Meta` の `status` を `in-review` にする（6c でコミットされるので、STEP 7 ではなくここで書く）。
+
+**[MUST]** `LINEAR_COMMENT` を投稿し、Linear のステータスを "In Review" にする（失敗したら黙って飛ばさず報告する）。
+
+### 6c: `/deploy --finalize`（TASK_FILE を commit → push → 分岐元へ）
+
+```
+/deploy "--finalize --task-file={TASK_FILE} --linear-id={LINEAR_ID}"
+```
+
+TASK_FILE だけを `docs(task):` でコミットして同じ作業ブランチに push し、分岐元（`base:`）に戻る（TASK_FILE が gitignore のリポジトリでは commit / push せず戻るだけ）。`FINALIZE` を返してくる。**返却は TASK_FILE に書かない**（書くと再び未コミット差分になる）。STEP 7 の deploy 行に添える。`- 中止:` があれば（他ファイルがステージ済み・リモートと分岐・分岐元へ戻れない等）理由をユーザーに報告する。中止時は**作業ブランチに留まったまま**で、残った変更はそのまま（履歴は書き換えない）。
+
+**6b と 6c の間で中断した場合**（`in-review` 済み・TASK_FILE 未コミット・作業ブランチ上）: 記録は失われない。次の追加修正モードは F2（`in-review`）を通り、その 6c で今回の記録と追加 push の記録がまとめて `docs(task):` コミットになる。先に回収したければ `/deploy "--finalize --task-file={TASK_FILE} --linear-id={LINEAR_ID}"` を単独で実行してよい（差分が無ければ何もせず分岐元に戻るだけなので再実行に安全）。
 
 ## STEP 7: 完了報告
 
@@ -411,9 +444,11 @@ deploy はコミット・push・PR / MR 作成（既存の PR / MR があれば�
 - deploy: ...
 ```
 
+deploy 行には PR / MR の URL に加えて 6c の `FINALIZE` の結果（`docs(task):` コミットの hash・push 先・現在のブランチ。中止ならその理由）を添える（TASK_FILE には書かない）。**現在のブランチは必ず示す**（6c を実行しなかった・中止した・P7 を飛ばしたときは作業ブランチに留まっている。`git branch --show-current` で確認する）。`status` は 6b で `in-review` にしてあるので STEP 7 では書かない。
+
 追加修正モードでは startproject 行を「（追加修正モード: スキップ）」または再設計時の結果にし、deploy 行に既存 PR / MR の URL を書く。
 
-フェーズ指定モードでは実行したフェーズの行だけを書き（書いた見出しと `利用AI:` の値・代筆の有無・`### RESULT` のフェーズ固有行: gate1 / escalation / verdict / pr）、他の行は「（未実行）」にする。`status` は変えていないので、次に回すフェーズと呼び出し例（`/orchestrate "--task-file=… --phase=… --ai=…"` または `--adopt=案 {k}`）を末尾に添える。
+フェーズ指定モードでは実行したフェーズの行だけを書き（書いた見出しと `利用AI:` の値・代筆の有無・`### RESULT` のフェーズ固有行: gate1 / escalation / verdict / pr。deploy は P7 の `FINALIZE` の結果と現在のブランチも添える。P7 を飛ばしたときは作業ブランチに留まっている旨を書く）、他の行は「（未実行）」にする。`status` は変えていないので、次に回すフェーズと呼び出し例（`/orchestrate "--task-file=… --phase=… --ai=…"` または `--adopt=案 {k}`）を末尾に添える。
 
 ## 状態管理
 
@@ -431,7 +466,7 @@ orchestrator は以下を変数として保持し、全 command に引数で渡�
 
 ### TASK_FILE の `status` と Linear ステータス
 
-各 STEP の開始時に `## Meta` の `status` を更新する（Gate 2 で STEP 4 に戻った場合も `implementing` に戻す）。`done` には orchestrator はしない。PR がマージされた後に人間が変更する。
+各 STEP の開始時に `## Meta` の `status` を更新する（Gate 2 で STEP 4 に戻った場合も `implementing` に戻す）。例外は `in-review` で、STEP 6b（deploy 返却後、作業ブランチ上）で書き、6c の `docs(task):` コミットに含める。`done` には orchestrator はしない。PR がマージされた後に人間が変更する。
 
 | タイミング | TASK_FILE `status` | Linear ステータス |
 |---|---|---|
@@ -440,5 +475,5 @@ orchestrator は以下を変数として保持し、全 command に引数で渡�
 | STEP 4 開始 | `implementing` | "In Progress" |
 | STEP 5 開始 | `reviewing` | — |
 | STEP 6 開始 | `deploying` | — |
-| STEP 6（deploy 返却後） | — | "In Review" |
-| STEP 7 | `in-review`（PR を出してマージ待ち） | — |
+| STEP 6b（deploy 返却後、作業ブランチ上） | `in-review`（PR を出してマージ待ち） | "In Review" |
+| STEP 7 | —（報告のみ。書き込みなし） | — |
