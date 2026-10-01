@@ -10,6 +10,12 @@ allowed-tools: Read, Write, Edit, Bash, Grep, Glob, Agent, Skill, AskUserQuestio
 
 # team-implement
 
+## 今回の引数
+
+$ARGUMENTS
+
+（引数の置き場所はここだけ。本文の「引数」はこの値を指す。Agent ツール経由で起動された場合は、プロンプトの `ARGUMENTS:` 行が引数）
+
 実装フェーズを担当。コード（実装・テスト）の読み書きと作業ブランチの作成は自分で行う（コミットはしない）。
 
 **TASK_FILE への書き込みと Linear への投稿は行わない。** 結果は OUTPUT フォーマットで呼び出し元（`/orchestrate` STEP 4）に返し、TASK_FILE の更新・Linear コメント投稿・ステータス変更は呼び出し元が行う。TASK_FILE は Read のみ。
@@ -17,7 +23,7 @@ allowed-tools: Read, Write, Edit, Bash, Grep, Glob, Agent, Skill, AskUserQuestio
 ## Input
 
 ```
-$ARGUMENTS の形式: "{task description} --tier={S|M|L} --task-file={TASK_FILE} --linear-id={LINEAR_ID}"
+引数の形式: "{task description} --tier={S|M|L} --task-file={TASK_FILE} --linear-id={LINEAR_ID}"
 ```
 
 | 引数 | 説明 |
@@ -42,8 +48,10 @@ feature ブランチで作業し（`## Meta` に `branch:` があれば差し戻
 | tier | 体制 |
 |---|---|
 | S | 自分で実装する |
-| M | 自分で実装するか、独立したモジュールを 1-2 サブエージェントに並列で任せて統合する |
+| M | 自分で実装する（サブエージェントに任せない） |
 | L | モジュール単位で分割してサブエージェントに割り当てる（実装・テストまで担当モジュール内で完結）。依存の調整と統合は自分が行う |
+
+S / M は orchestrate から Agent ツール経由（S は sonnet、M は opus）で起動されるため、中で Agent ツールを使わない（Agent の中でさらに Agent が使えるかは未確認。orchestrate.md「tier 別のフェーズ構成」）。
 
 ### エスカレーション
 

@@ -10,6 +10,12 @@ allowed-tools: Read, Bash, Grep, Glob, AskUserQuestion, TodoWrite, mcp__linear-s
 
 # startproject
 
+## 今回の引数
+
+$ARGUMENTS
+
+（引数の置き場所はここだけ。本文の「引数」はこの値を指す。Agent ツール経由で起動された場合は、プロンプトの `ARGUMENTS:` 行が引数）
+
 計画フェーズ（Phase 1–3）を担当。
 
 **読み取り専用（`agent: Plan`）。** Write / Edit / Agent が無いため、TASK_FILE への書き込み・Linear への投稿・サブエージェント（Agent ツール）の起動は行わない。成果物は OUTPUT フォーマットで呼び出し元（`/orchestrate`）に返し、**書き込みと Linear 投稿は呼び出し元が行う**。
@@ -19,7 +25,7 @@ allowed-tools: Read, Bash, Grep, Glob, AskUserQuestion, TodoWrite, mcp__linear-s
 ## Input
 
 ```
-$ARGUMENTS の形式: "{task description} --tier={S|M|L} --task-file={TASK_FILE} --linear-id={LINEAR_ID}"
+引数の形式: "{task description} --tier={S|M|L} --task-file={TASK_FILE} --linear-id={LINEAR_ID}"
 ```
 
 | 引数 | 説明 |
@@ -41,10 +47,10 @@ $ARGUMENTS の形式: "{task description} --tier={S|M|L} --task-file={TASK_FILE}
 成果物はすべて OUTPUT の `DESIGN` に含める（採用した方針とその理由 / 検討して却下した案 / 主要な変更ファイル）。ファイルは作成しない。
 Agent ツールが無いため、リサーチはサブエージェント経由ではなく**直接実行する**（`context: fork` でコンテキストは隔離済み）。
 
-$ARGUMENTS に「opencodeに相談」「opencode相談」「opencodeで設計」等のキーワードがあれば、tier に関係なく OpenCode に相談する。それ以外は tier で切り替える。
+引数に「opencodeに相談」「opencode相談」「opencodeで設計」等のキーワードがあれば、tier に関係なく OpenCode に相談する。それ以外は tier で切り替える。
 
 ### tier=S
-リサーチはしない。Phase 1 の理解から方針を 1-2 行で `DESIGN` に書いて Phase 3 へ進む。
+`/orchestrate` の通常フローでは S で startproject は呼ばれない（orchestrate が自分で計画する）。直接呼ばれた場合はリサーチはしない。Phase 1 の理解から方針を 1-2 行で `DESIGN` に書いて Phase 3 へ進む。
 
 ### tier=M
 OpenCode に設計相談する（Bash から直接実行）。呼び出し方・待ち方・失敗時の扱いは `$HOME/.claude/rules/tool-routing.md` の「OpenCode リサーチの実行」に従う。呼べなければ OpenCode なしで設計し、`DESIGN` に「OpenCode 不可: {理由}」と書く。

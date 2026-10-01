@@ -40,6 +40,14 @@
 
 Per-phase team structure is defined in each command (`startproject` / `team-implement` / `team-review`). XS skips `/orchestrate` and is implemented directly.
 
+Phases and models per tier (how each phase is launched: `orchestrate.md` "tier 別のフェーズ構成"):
+
+| Tier | startproject | team-implement | team-review | deploy |
+|------|--------------|----------------|-------------|--------|
+| **S** | Skipped (orchestrate plans) | sonnet | sonnet | haiku |
+| **M** | best | opus | opus | haiku |
+| **L** | best | best | opus | haiku |
+
 Both tables below use the same invocation: `timeout -k 1m 20m opencode run --agent plan -m github-copilot/gpt-5.6-sol` (details in `$HOME/.claude/rules/tool-routing.md`). Inside `/startproject` (no Agent tool) and `context: fork` commands, run it directly; elsewhere via a subagent.
 
 ### External Research (firecrawl MCP + OpenCode)

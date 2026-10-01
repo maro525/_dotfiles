@@ -8,6 +8,12 @@ allowed-tools: Read, Write, Edit, Bash, Grep, Glob, Workflow, AskUserQuestion
 
 # doc-clarity-check（ドキュメント明瞭性チェック）
 
+## 今回の引数
+
+$ARGUMENTS
+
+（引数の置き場所はここだけ。本文の「引数」はこの値を指す。Agent ツール経由で起動された場合は、プロンプトの `ARGUMENTS:` 行が引数）
+
 ユーザー向けの文章を **「業界・開発者しか分からない言葉になっていないか」「初めて見る人にも伝わるか」「何度読んでも誤解しないか」** という視点で点検するスキル。
 コードレビュー（`/code-review`）やデザインUX評価（`/critique`）とは別物で、**自然言語コピーの分かりやすさと正確さ** に特化する。
 
@@ -38,7 +44,7 @@ allowed-tools: Read, Write, Edit, Bash, Grep, Glob, Workflow, AskUserQuestion
 
 ### Step 1 — 対象を決める
 
-`$ARGUMENTS` を解釈する：
+引数を解釈する：
 
 - ファイルパス/glob が指定 → それを対象にする。
 - `--scope=diff` または対象未指定 → **現ブランチで変更したユーザー向けファイル** を既定対象にする

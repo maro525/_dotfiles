@@ -8,12 +8,18 @@ allowed-tools: Read, Write, Edit, Bash, Grep, Glob, Agent, Skill, AskUserQuestio
 
 # orchestrate
 
+## 今回の引数
+
+$ARGUMENTS
+
+（引数の置き場所はここだけ。本文の「引数」はこの値を指す。Agent ツール経由で起動された場合は、プロンプトの `ARGUMENTS:` 行が引数）
+
 プロジェクト全体のフローを管理する。各 command の実行・Gate 判定・状態管理を担当し、タスクの実行自体は各 command に委譲する。
 
 ## Input
 
 ```
-$ARGUMENTS の形式: "{task description}"
+引数の形式: "{task description}"
 例: "PROJ-573をやりたいです"
 例: "カート機能にクーポン適用を追加する"
 例（追加修正モード）: "レビュー指摘の型エラーを直す --task-file=.claude/docs/decisions/task-PROJ-573-coupon.md"
@@ -23,7 +29,7 @@ $ARGUMENTS の形式: "{task description}"
 
 ## 実行原則
 
-**$ARGUMENTS を受け取ったら「モード判定」を行い、通常モードは STEP 0 から、追加修正モードは STEP 3F から、フェーズ指定モードは STEP 3P から開始する。通常・追加修正モードは追加の指示がない限り STEP 7 まで完走する。フェーズ指定モードは 1 フェーズを 1 回実行して STEP 7 の報告で終わる。**
+**引数を受け取ったら「モード判定」を行い、通常モードは STEP 0 から、追加修正モードは STEP 3F から、フェーズ指定モードは STEP 3P から開始する。通常・追加修正モードは追加の指示がない限り STEP 7 まで完走する。フェーズ指定モードは 1 フェーズを 1 回実行して STEP 7 の報告で終わる。**
 
 - 全 STEP を自律的に順番に実行する。報告・通知はするが応答を待たずに次へ進む
 - 質問が必要なら質問し、回答を受け取ったら止まらず続行する
@@ -37,12 +43,12 @@ $ARGUMENTS の形式: "{task description}"
 
 | Gate | タイミング | 動作 |
 |---|---|---|
-| Gate 1 | startproject が計画提示時に自己判断で発動 | startproject 内でユーザー承認を待つ。orchestrate は返却を待つだけ |
+| Gate 1 | startproject が計画提示時に自己判断で発動（tier=S は orchestrate が解釈に迷ったときだけ。STEP 3） | startproject 内でユーザー承認を待つ。orchestrate は返却を待つだけ |
 | Gate 2 | team-review の FAIL 時 | ユーザーに報告し判断を待つ |
 
 ## モード判定
 
-$ARGUMENTS を受け取ったら最初にモードを決め、判定結果（モードと TASK_FILE）をユーザーに報告して続行する。ユーザーが別のモードを指示したらそれに従う。
+引数を受け取ったら最初にモードを決め、判定結果（モードと TASK_FILE）をユーザーに報告して続行する。ユーザーが別のモードを指示したらそれに従う。
 
 | モード | 判定 | 開始 STEP |
 |---|---|---|
@@ -59,6 +65,36 @@ $ARGUMENTS を受け取ったら最初にモードを決め、判定結果（モ
 - 追加修正モードは、`/orchestrate` が PR / MR を出したタスクに追加の変更（レビュー指摘への対応、仕様の追加など）を加えるときに使う。既存 PR への追加変更は必ずこのモードを通し、orchestrator が直接編集して push しない（`$HOME/.claude/rules/tool-routing.md` の「/orchestrate で作った PR への追加変更」）
 - 呼び出し形: `/orchestrate "{追加の依頼} --task-file={TASK_FILE}"`（または `/orchestrate "{LINEAR_ID} {追加の依頼}"`）
 
+## tier 別のフェーズ構成
+
+通常・追加修正モードの STEP 3〜6 は、tier で起動方法とモデルを変える（フェーズ指定モードは対象外）。
+
+| tier | STEP 3 startproject | STEP 4 team-implement | STEP 5 team-review | STEP 6 deploy |
+|---|---|---|---|---|
+| S | 起動しない（orchestrate が計画する。STEP 3 の「tier=S」） | Agent・`sonnet` | Agent・`sonnet` | Skill（haiku） |
+| M | Skill（best） | Agent・`opus` | Skill（opus） | Skill（haiku） |
+| L | Skill（best） | Skill（best） | Skill（opus） | Skill（haiku） |
+
+- **Skill:** `/{phase} "{引数}"` で呼ぶ。モデルは command の frontmatter の `model:` で決まり、呼び出し側からは変えられない
+- **Agent:** frontmatter と違うモデルで動かすときに使う。Agent ツールに command 定義を読ませて起動する（下記）。`best` は Agent の `model` に指定できないので、`best` を使うフェーズは Skill で呼ぶ
+- Agent で起動したフェーズはサブエージェントを使わない（team-implement の S / M、team-review の S はどれも自分で作業する体制）。Agent の中でさらに Agent が使えるかは確認していないため、Agent 経由に移すフェーズを増やすときは、その command の体制が Agent ツールを使わないことを先に確かめる
+- Agent も Skill と同じく、完了通知で返却を受け取るまで次の手順に進まない
+
+```
+Agent(
+  subagent_type: "general-purpose",
+  model: "{表のモデル}",
+  description: "{phase} ({tier})",
+  prompt: """
+Read $HOME/.claude/commands/{phase}.md and follow it exactly as your instructions for this run. Ignore its YAML frontmatter.
+
+ARGUMENTS: "{task description} --tier={tier} --task-file={TASK_FILE} --linear-id={LINEAR_ID}"
+
+Do not use the Agent tool; do all the work yourself. End your final message with the OUTPUT format the command specifies.
+"""
+)
+```
+
 ## STEP 0: CLASSIFY
 
 `$HOME/.claude/rules/adaptive-execution.md` の基準で tier を判定し、結果と根拠をユーザーに報告する。上書き指示がない限り即 STEP 1 へ進む。
@@ -67,7 +103,7 @@ $ARGUMENTS を受け取ったら最初にモードを決め、判定結果（モ
 
 ## STEP 1: LINEAR タスク確認
 
-$ARGUMENTS から Linear ID（例: `PROJ-573`）を検出する。
+引数から Linear ID（例: `PROJ-573`）を検出する。
 
 - **検出できた場合:** LINEAR_ID として使用（確認不要）。`mcp__linear-server__get_issue` でタスク詳細を取得してタスク説明を補完し、即 STEP 2 へ
 - **検出できなかった場合:** ユーザーに Linear タスク ID または URL を質問する。既存タスクがあれば ID を取得、なければ `mcp__linear-server__save_issue` で新規作成し、即 STEP 2 へ
@@ -120,6 +156,24 @@ TASK_FILE = .claude/docs/decisions/task-{LINEAR_ID}-{feature}.md
 `##` 見出しはプロセス名で固定する（kanban がこの見出しでフェーズを判定する）。
 
 ## STEP 3: startproject を実行
+
+### tier=S
+
+startproject は起動せず、orchestrator が関連コードを読んで計画し、TASK_FILE に直接書く。リサーチと OpenCode への設計相談はしない。
+
+| 書き込み先 | 内容 |
+|---|---|
+| `## startproject` > `### Brief` | Goal / Scope / Success Criteria を数行 |
+| `## startproject` > `### Design` | 方針を 1-2 行 |
+| `## startproject` > `### Plan` | 実装タスクリスト |
+
+- コードを読んで S に収まらない（ファイル数・設計判断・リスクが S を超える）と分かったら、tier を上げて報告し、下の「tier=M / L」を実行する
+- タスクの解釈が複数考えられるときだけ `AskUserQuestion` で確認する（Gate 1 相当）。確認した場合の `GATE1` は `approved` / `revised`、確認しなければ `skipped`
+- **[MUST]** 計画の要約を `mcp__linear-server__save_comment` で LINEAR_ID に投稿する
+
+書き終えたら即 STEP 4 へ進む。
+
+### tier=M / L
 
 ```
 /startproject "{task description} --tier={tier} --task-file={TASK_FILE} --linear-id={LINEAR_ID}"
@@ -277,7 +331,7 @@ STEP 3F F1 と同じ場所から `LINEAR_ID` / `tier` / task description / `bran
 ```
 Read {SKILL_PATH} and follow it exactly as your instructions for this run.
 
-$ARGUMENTS: "{task description} --task-file={TASK_FILE の絶対パス} --tier={tier} --linear-id={LINEAR_ID} --label={label}"
+ARGUMENTS: "{task description} --task-file={TASK_FILE の絶対パス} --tier={tier} --linear-id={LINEAR_ID} --label={label}"
 
 Current date and time: {YYYY-MM-DD HH:MM}. Use this value wherever the skill needs a timestamp; do not guess one.
 
@@ -354,6 +408,8 @@ P7 を飛ばしたとき（`pr: 中止（…）`）や中止したときは、�
 
 開始時に「状態管理」に従い TASK_FILE の `status` と Linear のステータスを更新する。**完了次第即 STEP 5 へ進む。**
 
+起動方法は「tier 別のフェーズ構成」に従う（S は Agent・`sonnet`、M は Agent・`opus`、L は下の Skill）。
+
 ```
 /team-implement "{task description} --tier={tier} --task-file={TASK_FILE} --linear-id={LINEAR_ID}"
 ```
@@ -381,6 +437,8 @@ team-implement はコードと git 操作のみ行い、`IMPLEMENTATION_NOTES` /
 **完了確認:** `ESCALATION` がなく、`## team-implement` が埋まっていることを確認してから STEP 5 へ進む。
 
 ## STEP 5: team-review を実行
+
+起動方法は「tier 別のフェーズ構成」に従う（S は Agent・`sonnet`、M / L は下の Skill）。
 
 ```
 /team-review "{task description} --tier={tier} --task-file={TASK_FILE} --linear-id={LINEAR_ID}"
@@ -456,7 +514,7 @@ TASK_FILE だけを `docs(task):` でコミットして同じ作業ブランチ�
 
 deploy 行には PR / MR の URL に加えて 6c の `FINALIZE` の結果（`docs(task):` コミットの hash・push 先・現在のブランチ。中止ならその理由）を添える（TASK_FILE には書かない）。**現在のブランチは必ず示す**（6c を実行しなかった・中止した・P7 を飛ばしたときは作業ブランチに留まっている。`git branch --show-current` で確認する）。`status` は 6b で `in-review` にしてあるので STEP 7 では書かない。
 
-追加修正モードでは startproject 行を「（追加修正モード: スキップ）」または再設計時の結果にし、deploy 行に既存 PR / MR の URL を書く。
+tier=S では startproject 行を「（S: orchestrate が計画、Gate 1: {GATE1}）」にする。追加修正モードでは startproject 行を「（追加修正モード: スキップ）」または再設計時の結果にし、deploy 行に既存 PR / MR の URL を書く。
 
 フェーズ指定モードでは実行したフェーズの行だけを書き（書いた見出しと `利用AI:` の値・代筆の有無・`### RESULT` のフェーズ固有行: gate1 / escalation / verdict / pr。deploy は P7 の `FINALIZE` の結果と現在のブランチも添える。P7 を飛ばしたときは作業ブランチに留まっている旨を書く）、他の行は「（未実行）」にする。`status` は実行したフェーズの値（P4 の表）になっているので、次に回すフェーズと呼び出し例（`/orchestrate "--task-file=… --phase=… --ai=…"` または `--adopt=案 {k}`）を末尾に添える。
 
@@ -470,7 +528,7 @@ orchestrator は以下を変数として保持し、全 command に引数で渡�
 |---|---|
 | `tier` | STEP 0（追加修正モードは STEP 3F F1 で `## Meta` の `tier:` から復元。F3 の再設計で更新） |
 | `LINEAR_ID` | STEP 1（追加修正モードは STEP 3F F1 で `## Meta` の `linear_id:` から復元） |
-| `TASK_FILE` | STEP 2（追加修正モードは $ARGUMENTS または Linear ID から特定。フェーズ指定モードは $ARGUMENTS の `--task-file` 必須） |
+| `TASK_FILE` | STEP 2（追加修正モードは引数または Linear ID から特定。フェーズ指定モードは引数の `--task-file` 必須） |
 
 作業ブランチとその分岐元は、引数ではなく TASK_FILE の `## Meta` の `branch:` / `base:` で受け渡す（STEP 4 で記入。追加修正モードでは既存の値をそのまま使う。フェーズ指定モードの team-implement は外部 CLI が書き、未書き込みなら P4 で代筆する）。
 
