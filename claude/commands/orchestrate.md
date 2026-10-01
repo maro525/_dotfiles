@@ -37,7 +37,7 @@ $ARGUMENTS の形式: "{task description}"
 
 | Gate | タイミング | 動作 |
 |---|---|---|
-| Gate 1 | startproject が計画提示時に自己判断で発動 | startproject 内でユーザー承認を待つ。orchestrate は返却を待つだけ |
+| Gate 1 | startproject が計画提示時に自己判断で発動（tier=S は orchestrate が解釈に迷ったときだけ。STEP 3） | startproject 内でユーザー承認を待つ。orchestrate は返却を待つだけ |
 | Gate 2 | team-review の FAIL 時 | ユーザーに報告し判断を待つ |
 
 ## モード判定
@@ -55,6 +55,36 @@ $ARGUMENTS を受け取ったら最初にモードを決め、判定結果（モ
 - 呼び出し形: `/orchestrate "--task-file={TASK_FILE} --phase={phase} --ai={pi|cline|opencode|codex}[:{model}]"`、候補の採用は `/orchestrate "--task-file={TASK_FILE} --phase=startproject --adopt=案 {k}"`
 - 追加修正モードは、`/orchestrate` が PR / MR を出したタスクに追加の変更（レビュー指摘への対応、仕様の追加など）を加えるときに使う。既存 PR への追加変更は必ずこのモードを通し、orchestrator が直接編集して push しない（`$HOME/.claude/rules/tool-routing.md` の「/orchestrate で作った PR への追加変更」）
 - 呼び出し形: `/orchestrate "{追加の依頼} --task-file={TASK_FILE}"`（または `/orchestrate "{LINEAR_ID} {追加の依頼}"`）
+
+## tier 別のフェーズ構成
+
+通常・追加修正モードの STEP 3〜6 は、tier で起動方法とモデルを変える（フェーズ指定モードは対象外）。
+
+| tier | STEP 3 startproject | STEP 4 team-implement | STEP 5 team-review | STEP 6 deploy |
+|---|---|---|---|---|
+| S | 起動しない（orchestrate が計画する。STEP 3 の「tier=S」） | Agent・`sonnet` | Agent・`sonnet` | Skill（haiku） |
+| M | Skill（best） | Agent・`opus` | Skill（opus） | Skill（haiku） |
+| L | Skill（best） | Skill（best） | Skill（opus） | Skill（haiku） |
+
+- **Skill:** `/{phase} "{引数}"` で呼ぶ。モデルは command の frontmatter の `model:` で決まり、呼び出し側からは変えられない
+- **Agent:** frontmatter と違うモデルで動かすときに使う。Agent ツールに command 定義を読ませて起動する（下記）。`best` は Agent の `model` に指定できないので、`best` を使うフェーズは Skill で呼ぶ
+- Agent で起動したフェーズはサブエージェントを使わない（team-implement の S / M、team-review の S はどれも自分で作業する体制）。Agent の中でさらに Agent が使えるかは確認していないため、Agent 経由に移すフェーズを増やすときは、その command の体制が Agent ツールを使わないことを先に確かめる
+- Agent も Skill と同じく、完了通知で返却を受け取るまで次の手順に進まない
+
+```
+Agent(
+  subagent_type: "general-purpose",
+  model: "{表のモデル}",
+  description: "{phase} ({tier})",
+  prompt: """
+Read $HOME/.claude/commands/{phase}.md and follow it exactly as your instructions for this run. Ignore its YAML frontmatter.
+
+$ARGUMENTS: "{task description} --tier={tier} --task-file={TASK_FILE} --linear-id={LINEAR_ID}"
+
+Do not use the Agent tool; do all the work yourself. End your final message with the OUTPUT format the command specifies.
+"""
+)
+```
 
 ## STEP 0: CLASSIFY
 
@@ -117,6 +147,24 @@ TASK_FILE = .claude/docs/decisions/task-{LINEAR_ID}-{feature}.md
 `##` 見出しはプロセス名で固定する（kanban がこの見出しでフェーズを判定する）。
 
 ## STEP 3: startproject を実行
+
+### tier=S
+
+startproject は起動せず、orchestrator が関連コードを読んで計画し、TASK_FILE に直接書く。リサーチと OpenCode への設計相談はしない。
+
+| 書き込み先 | 内容 |
+|---|---|
+| `## startproject` > `### Brief` | Goal / Scope / Success Criteria を数行 |
+| `## startproject` > `### Design` | 方針を 1-2 行 |
+| `## startproject` > `### Plan` | 実装タスクリスト |
+
+- コードを読んで S に収まらない（ファイル数・設計判断・リスクが S を超える）と分かったら、tier を上げて報告し、下の「tier=M / L」を実行する
+- タスクの解釈が複数考えられるときだけ `AskUserQuestion` で確認する（Gate 1 相当）。確認した場合の `GATE1` は `approved` / `revised`、確認しなければ `skipped`
+- **[MUST]** 計画の要約を `mcp__linear-server__save_comment` で LINEAR_ID に投稿する
+
+書き終えたら即 STEP 4 へ進む。
+
+### tier=M / L
 
 ```
 /startproject "{task description} --tier={tier} --task-file={TASK_FILE} --linear-id={LINEAR_ID}"
@@ -328,6 +376,8 @@ startproject / team-review は TASK_FILE 以外を変更しない前提（SKILL.
 
 開始時に「状態管理」に従い TASK_FILE の `status` と Linear のステータスを更新する。**完了次第即 STEP 5 へ進む。**
 
+起動方法は「tier 別のフェーズ構成」に従う（S は Agent・`sonnet`、M は Agent・`opus`、L は下の Skill）。
+
 ```
 /team-implement "{task description} --tier={tier} --task-file={TASK_FILE} --linear-id={LINEAR_ID}"
 ```
@@ -355,6 +405,8 @@ team-implement はコードと git 操作のみ行い、`IMPLEMENTATION_NOTES` /
 **完了確認:** `ESCALATION` がなく、`## team-implement` が埋まっていることを確認してから STEP 5 へ進む。
 
 ## STEP 5: team-review を実行
+
+起動方法は「tier 別のフェーズ構成」に従う（S は Agent・`sonnet`、M / L は下の Skill）。
 
 ```
 /team-review "{task description} --tier={tier} --task-file={TASK_FILE} --linear-id={LINEAR_ID}"
@@ -411,7 +463,7 @@ deploy はコミット・push・PR / MR 作成（既存の PR / MR があれば�
 - deploy: ...
 ```
 
-追加修正モードでは startproject 行を「（追加修正モード: スキップ）」または再設計時の結果にし、deploy 行に既存 PR / MR の URL を書く。
+tier=S では startproject 行を「（S: orchestrate が計画、Gate 1: {GATE1}）」にする。追加修正モードでは startproject 行を「（追加修正モード: スキップ）」または再設計時の結果にし、deploy 行に既存 PR / MR の URL を書く。
 
 フェーズ指定モードでは実行したフェーズの行だけを書き（書いた見出しと `利用AI:` の値・代筆の有無・`### RESULT` のフェーズ固有行: gate1 / escalation / verdict / pr）、他の行は「（未実行）」にする。`status` は変えていないので、次に回すフェーズと呼び出し例（`/orchestrate "--task-file=… --phase=… --ai=…"` または `--adopt=案 {k}`）を末尾に添える。
 

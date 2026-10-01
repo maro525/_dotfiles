@@ -44,7 +44,7 @@ Agent ツールが無いため、リサーチはサブエージェント経由�
 $ARGUMENTS に「opencodeに相談」「opencode相談」「opencodeで設計」等のキーワードがあれば、tier に関係なく OpenCode に相談する。それ以外は tier で切り替える。
 
 ### tier=S
-リサーチはしない。Phase 1 の理解から方針を 1-2 行で `DESIGN` に書いて Phase 3 へ進む。
+`/orchestrate` の通常フローでは S で startproject は呼ばれない（orchestrate が自分で計画する）。直接呼ばれた場合はリサーチはしない。Phase 1 の理解から方針を 1-2 行で `DESIGN` に書いて Phase 3 へ進む。
 
 ### tier=M
 OpenCode に設計相談する（Bash から直接実行）。呼び出し方・待ち方・失敗時の扱いは `$HOME/.claude/rules/tool-routing.md` の「OpenCode リサーチの実行」に従う。呼べなければ OpenCode なしで設計し、`DESIGN` に「OpenCode 不可: {理由}」と書く。

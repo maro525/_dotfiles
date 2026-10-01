@@ -52,6 +52,8 @@ tier に応じたレビュアーを同時に起動する。**レビュー中は�
 | M | Claude / OpenCode / Security |
 | L | Claude / OpenCode / Security / Simplify |
 
+S は orchestrate から Agent ツール経由（sonnet）で起動されるため、Claude レビュアーは自分が担当し、Agent ツールは使わない（orchestrate.md「tier 別のフェーズ構成」）。
+
 | レビュアー | 方法 |
 |---|---|
 | Claude | 変更ファイルを直接読み、Quality / Logic の観点でレビュー |
