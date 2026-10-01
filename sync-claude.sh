@@ -19,15 +19,22 @@ sync_common::show_header "$(basename "$0")"
 # personal config either.
 SKILL_EXCLUDES=("${SYNC_COMMON_CLOUDFLARE_SKILLS[@]}" synced)
 
+# The /orchestrate workflow lives in its own repository (maro525/harness) and
+# is synced by its sync-claude.sh. Keep these lists in step with HARNESS_FILES
+# there.
+HARNESS_COMMANDS=(orchestrate.md startproject.md team-implement.md team-review.md deploy.md)
+HARNESS_RULES=(adaptive-execution.md tool-routing.md)
+HARNESS_HOOKS=(agent-router.py)
+
 # Top-level config files
 sync_common::sync_file "$SOURCE/CLAUDE.md"     "$DEST/CLAUDE.md"     "CLAUDE.md" || true
 sync_common::sync_file "$SOURCE/settings.json" "$DEST/settings.json" "settings.json" || true
 
 # Subdirectories — sync every file (bidirectional discovery surfaces files
 # that exist only in repo or only in HOME).
-sync_common::sync_directory "$SOURCE/commands" "$DEST/commands" "*" || true
-sync_common::sync_directory "$SOURCE/hooks"    "$DEST/hooks"    "*" || true
-sync_common::sync_directory "$SOURCE/rules"    "$DEST/rules"    "*" || true
+sync_common::sync_directory "$SOURCE/commands" "$DEST/commands" "*" "${HARNESS_COMMANDS[@]}" || true
+sync_common::sync_directory "$SOURCE/hooks"    "$DEST/hooks"    "*" "${HARNESS_HOOKS[@]}" __pycache__ || true
+sync_common::sync_directory "$SOURCE/rules"    "$DEST/rules"    "*" "${HARNESS_RULES[@]}" || true
 sync_common::sync_directory "$SOURCE/skills"   "$DEST/skills"   "*" "${SKILL_EXCLUDES[@]}" || true
 
 echo ""

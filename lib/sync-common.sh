@@ -1,5 +1,6 @@
 #!/bin/bash
 # Shared sync helpers for sync-pi.sh / sync-claude.sh / sync-opencode.sh / sync-cline.sh.
+# A copy lives in maro525/harness (its sync scripts); port fixes to both.
 #
 # Provides:
 #   - Interactive diff + a/p/h/H/s/d/q prompt for syncing HOME <-> repo
