@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import pytest
 
-from taskboard.model import ParsedTask
+from taskboard.model import ParsedTask, Verdict
 from taskboard.phases import classify, evidence_phase, normalize_status
 
 
@@ -17,6 +17,7 @@ def make_task(
     status: str | None = None,
     sections: frozenset[str] = frozenset(),
     tags: frozenset[str] = frozenset(),
+    verdict: Verdict | None = None,
 ) -> ParsedTask:
     return ParsedTask(
         path="/tmp/task-ABC-1-x.md",
@@ -33,6 +34,7 @@ def make_task(
         decision_tags=tags,
         mtime=0.0,
         size=0,
+        latest_review_verdict=verdict,
     )
 
 
@@ -177,3 +179,77 @@ def test_unknown_when_no_signal_at_all() -> None:
 )
 def test_leading_token_beats_trailing_commentary(raw: str, expected: str) -> None:
     assert normalize_status(raw) == expected
+
+
+REVIEWED = frozenset({"startproject", "team-implement", "team-review"})
+
+
+def test_sent_back_at_gate_two_is_implementing_not_stale() -> None:
+    """The headline case: status implementing, latest review FAIL, rework pending."""
+    card = classify(make_task(status="implementing", sections=REVIEWED, verdict="FAIL"))
+    assert card.phase == "implementing"
+    assert card.evidence_phase == "implementing"
+    assert card.stale_status is False
+
+
+def test_pass_on_the_latest_round_is_review_evidence() -> None:
+    card = classify(make_task(status="reviewing", sections=REVIEWED, verdict="PASS"))
+    assert card.phase == "review"
+    assert card.evidence_phase == "review"
+    assert card.stale_status is False
+
+
+def test_pass_with_status_left_at_implementing_is_still_stale() -> None:
+    """A forgotten `status:` update after PASS must keep being surfaced."""
+    card = classify(make_task(status="implementing", sections=REVIEWED, verdict="PASS"))
+    assert card.phase == "review"
+    assert card.stale_status is True
+
+
+def test_review_without_a_verdict_line_is_review_evidence() -> None:
+    card = classify(make_task(status="implementing", sections=REVIEWED, verdict=None))
+    assert card.phase == "review"
+    assert card.stale_status is True
+
+
+def test_sent_back_without_status_is_implementing() -> None:
+    card = classify(make_task(status=None, sections=REVIEWED, verdict="FAIL"))
+    assert card.phase == "implementing"
+    assert card.declared_phase is None
+    assert card.stale_status is False
+
+
+def test_deploy_evidence_beats_the_sent_back_rule() -> None:
+    card = classify(make_task(status="in-review", sections=REVIEWED | {"deploy"}, verdict="FAIL"))
+    assert card.phase == "deploy"
+    assert card.stale_status is False
+
+
+def test_sent_back_with_status_planning_is_stale_implementing() -> None:
+    card = classify(make_task(status="planning", sections=REVIEWED, verdict="FAIL"))
+    assert card.phase == "implementing"
+    assert card.stale_status is True
+
+
+def test_sent_back_declared_reviewing_stays_in_review_without_stale() -> None:
+    """`reviewing` after a FAIL means the rework is being reviewed again."""
+    card = classify(make_task(status="reviewing", sections=REVIEWED, verdict="FAIL"))
+    assert card.phase == "review"
+    assert card.evidence_phase == "implementing"
+    assert card.stale_status is False
+
+
+def test_legacy_review_section_with_fail_is_also_sent_back() -> None:
+    task = make_task(
+        status="implementing",
+        sections=frozenset({"brief", "implementation notes", "review"}),
+        verdict="FAIL",
+    )
+    assert evidence_phase(task) == "implementing"
+
+
+def test_decision_log_review_tag_with_fail_is_also_sent_back() -> None:
+    task = make_task(
+        tags=frozenset({"startproject", "team-implement", "team-review"}), verdict="FAIL"
+    )
+    assert evidence_phase(task) == "implementing"

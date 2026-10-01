@@ -1,6 +1,6 @@
 ---
 name: deploy
-description: Deploy phase of a task file workflow. Commits the reviewed changes on the work branch, pushes it, creates a PR/MR with gh or glab (or pushes to and annotates an existing open PR/MR), and records the result in the deploy section of the task file. Use when a task file's team-review is PASS and the change is ready to become a pull/merge request.
+description: Deploy phase of a task file workflow. Commits the reviewed changes on the work branch, pushes it, creates a PR/MR with gh or glab (or pushes to and annotates an existing open PR/MR), and records the result in the deploy section of the task file. Stays on the work branch and leaves the task file uncommitted; committing it and returning to the base branch is left to the caller. Use when a task file's team-review is PASS and the change is ready to become a pull/merge request.
 metadata:
   phase: deploy
   writes: "## deploy"
@@ -9,6 +9,8 @@ metadata:
 # deploy
 
 デプロイフェーズを担当。コミット・push・PR / MR 作成を行い、結果を TASK_FILE の `## deploy` に自分で書き込む。動作検証は team-review で済んでいるので行わない。
+
+**終了後も作業ブランチに留まる**（分岐元には戻らない）。TASK_FILE 自体はコミットせず、作業ブランチ上に未コミットのまま残す。TASK_FILE の `docs(task):` コミット → 同じブランチへの push → 分岐元への復帰は**呼び出し元が行う**（手動で実行したときは自分で行う）。TASK_FILE を gitignore していないリポジトリでは、そのコミットが PR / MR に載る（公開したくなければ `.claude/` を `.gitignore` に入れておく）。
 
 前提: 作業ブランチ作成済み・team-review PASS 済み。作業ブランチに open な PR / MR が既にあれば、新規作成せず**追加 push と本文追記**を行う。
 
@@ -97,7 +99,7 @@ glab mr list --source-branch {branch} --all                            # GitLab
 作業ブランチ上の未コミット変更（team-implement の実装。レビュー通過済み）をコミットする。
 
 - **TASK_FILE のスコープ外の変更は巻き込まない**（Brief の対象外のファイル・別タスクの持ち越し変更は `git add` しない。`git add -A` は使わずファイルを指定する）
-- TASK_FILE 自体を含めるかはプロジェクトの慣習に従う。`.gitignore` されていれば含めない（`git check-ignore -q {TASK_FILE}` で確認）
+- **TASK_FILE 自体はコミットしない**（`## deploy` はこの後 STEP 4 で書く。その記録のコミットは呼び出し元が `docs(task):` で行う）
 - メッセージは `## team-implement` の内容から作る。追加 push なら本文に `追加依頼 {n}` を書く
 
 ```bash
@@ -165,19 +167,9 @@ glab mr view {IID} --output json | jq -r .description > body.md && printf '\n{�
 
 ---
 
-## STEP 4: RETURN TO ORIGINAL BRANCH
+## STEP 4: 書き込みと報告
 
-`base:` のブランチに戻る（空ならリポジトリのデフォルトブランチ）。
-
-```bash
-git switch {base}
-```
-
----
-
-## STEP 5: 書き込みと報告
-
-**[MUST]** TASK_FILE の `## deploy` を記入する。
+**[MUST]** 作業ブランチに留まったまま、TASK_FILE の `## deploy` を記入する（分岐元には戻らない）。
 
 **新規作成型:**
 
@@ -216,7 +208,7 @@ git switch {base}
 
 ## 最終メッセージ
 
-必ずこの形で終える。TASK_FILE に書けなかった場合（サンドボックス等）は `written: no` とし、呼び出し元が `SECTION` の内容を代筆する。中止した場合は TASK_FILE には何も書かず、`written: no（中止）` と `pr: 中止（理由）` で返す（`SECTION` には中止理由を `### 中止` として書く。これは報告用で、呼び出し元も代筆しない）。
+必ずこの形で終える。TASK_FILE への書き込みは作業ブランチ上で未コミットのまま残す（コミット・push と分岐元への復帰は呼び出し元が行う）。TASK_FILE に書けなかった場合（サンドボックス等）は `written: no` とし、呼び出し元が `SECTION` の内容を代筆する。中止した場合は TASK_FILE には何も書かず、`written: no（中止）` と `pr: 中止（理由）` で返す（`SECTION` には中止理由を `### 中止` として書く。これは報告用で、呼び出し元も代筆しない）。
 
 ```markdown
 ### RESULT

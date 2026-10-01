@@ -13,7 +13,7 @@ agents/
     ├── startproject/SKILL.md    # 計画: Brief / Design / Plan（--label ありなら ### 案 {k} + 利用AI 行）
     ├── team-implement/SKILL.md  # 実装: feature ブランチ + TDD、### {m}回目 + 利用AI 行、Meta の branch/base
     ├── team-review/SKILL.md     # レビュー: 観点別（Quality/Logic → Security → Simplify）、判定 PASS/FAIL
-    └── deploy/SKILL.md          # commit → push → PR/MR（gh / glab）、#### PR / MR + 利用AI 行
+    └── deploy/SKILL.md          # commit → push → PR/MR（gh / glab）、#### PR / MR + 利用AI 行。作業ブランチに留まる（TASK_FILE のコミットと分岐元への復帰は呼び出し元）
 ```
 
 配布先は `~/.agents/skills/{name}/`（`./sync-agents.sh`）。Cline だけは `~/.cline/skills/{name}` → `~/.agents/skills/{name}` の symlink で読ませる。
@@ -50,7 +50,7 @@ orchestrate のフェーズ指定モードは探索に頼らず、プロンプ�
 
 `/orchestrate` のフェーズ指定モード（`../claude/commands/orchestrate.md` STEP 3P）が、既存 TASK_FILE の 1 フェーズを外部 CLI に実行させるときの呼び出し表。対象 CLI は **pi / cline / opencode / codex**（Claude の別モデルは対象外。`context: fork` の command は frontmatter の `model` が優先され `--model` で変えられない）。読ませる定義は `~/.agents/skills/{phase}/SKILL.md`（この `skills/` の配布先。配布は `../sync-agents.sh`）。
 
-**CLI の起動オプション・権限・最終メッセージの取り出し・共通則は、この節が唯一の定義。** `../claude/rules/tool-routing.md` には書かない（毎回読み込まれるファイルだが、この内容を使うのはフェーズ指定モードだけ）。手で 1 フェーズを回すときも同じ表のコマンドに `"$(cat {prompt_file})"` を渡し、`--label={ai}/{model}` を付ける（TASK_FILE の書き方が orchestrate 経由と同じになる。「共通規約」の見出し・利用AI 行）。
+**CLI の起動オプション・権限・最終メッセージの取り出し・共通則は、この節が唯一の定義。** `../claude/rules/tool-routing.md` には書かない（毎回読み込まれるファイルだが、この内容を使うのはフェーズ指定モードだけ）。手で 1 フェーズを回すときも同じ表のコマンドに `"$(cat {prompt_file})"` を渡し、`--label={ai}/{model}` を付ける（TASK_FILE の書き方が orchestrate 経由と同じになる。「共通規約」の見出し・利用AI 行）。deploy を手で回したときは CLI が作業ブランチに留まり TASK_FILE を未コミットで残すので、自分で TASK_FILE だけを `docs(task):` でコミットして同じブランチに push し、分岐元に戻る（orchestrate 経由では STEP 3P P7 が `/deploy "--finalize --task-file=…"` で行う）。**TASK_FILE を gitignore していないリポジトリでは、このコミットが PR / MR に載る**（設計の検討内容・Linear ID などの社内向けメモが公開範囲に入る）。公開したくなければ `.claude/`（または `.claude/docs/decisions/`）を `.gitignore` に入れておく（gitignore なら finalize は commit / push せず分岐元に戻るだけ）。
 
 ### orchestrate からの参照
 
@@ -154,12 +154,13 @@ timeout -k 1m 30m {上表のコマンド} "$(cat {prompt_file})" < /dev/null > {
 |---|---|---|
 | TASK_FILE の書き手 | orchestrate（command は OUTPUT を返す） | 各フェーズ自身（`written: no` のときだけ orchestrate が代筆） |
 | Linear | orchestrate が投稿・ステータス変更 | 連携ツールがあればコメントのみ。ステータスは変えない |
-| `status:` | orchestrate が各 STEP で更新 | 書かない（フェーズ指定モードでも orchestrate は変えない） |
+| `status:` | orchestrate が各 STEP で更新 | 書かない（フェーズ指定モードでは orchestrate が STEP 3P P4 で、実行したフェーズの値に更新する） |
 | 回数・候補 | `### {m}回目` | 同じ `### {m}回目`（startproject は `### 案 {k}`）。実行者は見出し直下の `利用AI: {label}（{日時}）` 行 |
 | 承認（Gate 1） | AskUserQuestion で待つ | 質問できれば待つ。候補モード・非対話では `gate1: 要確認` |
 | 並列レビュアー（team-review） | Claude / OpenCode / Security / Simplify を並列 | 同一モデルで観点を順に（Quality/Logic → Security → Simplify）。セカンドオピニオンは任意 |
 | 外部リサーチ・設計相談 | firecrawl + `opencode run` | 使えるツールがあれば。無ければ「不可: {理由}」 |
 | deploy の Ad-hoc Git モード | あり | なし（Deploy Workflow のみ） |
+| 分岐元への復帰 / TASK_FILE のコミット | deploy は作業ブランチに留まり、`/deploy --finalize`（STEP 6c / 3P P7）が TASK_FILE だけを `docs(task):` でコミット・push して分岐元へ戻る | 作業ブランチに留まり TASK_FILE は未コミット。コミット・push・復帰は呼び出し元（orchestrate 経由なら P7、手動なら自分） |
 | 共通ルールの参照 | `$HOME/.claude/rules/*.md` | 各 SKILL.md に内包 |
 
 一般向け定義から Claude 版を生成することはしない（構造が違う）。Claude 版を変えたら、この表を見て対応する SKILL.md を手で追随させる。
@@ -172,7 +173,9 @@ timeout -k 1m 30m {上表のコマンド} "$(cat {prompt_file})" < /dev/null > {
 /orchestrate "--task-file=… --phase=startproject --adopt=案 2"
    → 案 2 の #### Brief/Design/Plan を ### Brief/Design/Plan に昇格（利用AI 行の直後に 採用: {日時} を追加。見出しは変えない）
 /orchestrate "--task-file=… --phase=team-review --ai=codex"
-   → ## team-review に ### 1回目 を追記（直下に 利用AI: codex（…）。status は変わらない）
+   → ## team-review に ### 1回目 を追記（直下に 利用AI: codex（…）。status は reviewing になる）
+/orchestrate "--task-file=… --phase=deploy --ai=pi"
+   → ## deploy に #### PR / MR を追記（直下に 利用AI: pi）。CLI は作業ブランチに留まり、P7 の /deploy --finalize が TASK_FILE を docs(task): で同じブランチに push して分岐元へ戻る（P4 で status は in-review になり、その記録も docs(task): に含まれる）
 ```
 
 TASK_FILE に書かれる形（`### 案 {k}` の例。`### {m}回目` も同じ）:
@@ -186,7 +189,7 @@ TASK_FILE に書かれる形（`### 案 {k}` の例。`### {m}回目` も同じ�
 …
 ```
 
-どのフェーズも同じ権限で起動し（上の「権限」）、CLI が TASK_FILE に直接書く。実行日時は orchestrate がプロンプトで渡す（CLI 側で推定させない）。orchestrate は `## {phase}` 節内の期待見出し（`### 案 {k}` / `### {m}回目` の完全一致。見出しに AI 名が無いので、同じ見出しが並んでいても起動前後の出現数の差で判定する）が起動前より増えていなければ、最終メッセージの `### SECTION` から代筆する。増えていても直下に `利用AI:` 行が無ければ orchestrate が足す。startproject / team-review では起動前後で作業ツリー・HEAD・ref・stash を比べ、TASK_FILE 以外に変化があれば報告する。
+どのフェーズも同じ権限で起動し（上の「権限」）、CLI が TASK_FILE に直接書く。実行日時は orchestrate がプロンプトで渡す（CLI 側で推定させない）。orchestrate は `## {phase}` 節内の期待見出し（`### 案 {k}` / `### {m}回目` の完全一致。見出しに AI 名が無いので、同じ見出しが並んでいても起動前後の出現数の差で判定する）が起動前より増えていなければ、最終メッセージの `### SECTION` から代筆する。増えていても直下に `利用AI:` 行が無ければ orchestrate が足す。節の確認が済んだら orchestrate が `## Meta` の `status:` を実行したフェーズの値（startproject / `--adopt` → `planning`、team-implement → `implementing`、team-review → `reviewing`、deploy → `in-review`）に更新する（CLI は書かない。失敗時は変えない）。startproject / team-review では起動前後で作業ツリー・HEAD・ref・stash を比べ、TASK_FILE 以外に変化があれば報告する。
 
 ## 検証
 
