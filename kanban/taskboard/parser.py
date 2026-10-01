@@ -17,7 +17,7 @@ from __future__ import annotations
 import os
 import re
 
-from .model import DECISION_TAGS, ParsedTask
+from .model import DECISION_TAGS, ParsedTask, Verdict
 
 _H1 = re.compile(r"^#\s+(.+?)\s*$", re.MULTILINE)
 _H2 = re.compile(r"^##\s+(.+?)\s*$", re.MULTILINE)
@@ -65,6 +65,32 @@ _PLACEHOLDER = re.compile(
 #: placeholder rather than real content.
 _MIN_MEANINGFUL_CHARS = 4
 
+#: A whole line that is a markdown heading (`### Brief`, `#### 判定`). The
+#: template ships `## startproject` with its `### Brief / Design / Plan`
+#: sub-headings already in place, so headings alone are not content.
+_HEADING_LINE = re.compile(r"^[ \t]*#{1,6}[ \t].*$", re.MULTILINE)
+
+#: A fenced code block. Sections quote command examples and sample headings
+#: inside fences, and those must not be read as rounds or verdicts. The fence
+#: may be longer than three backticks (a ```` fence wraps a ``` example), and
+#: the closing fence must be at least as long as the opening one.
+_FENCE = re.compile(r"^[ \t]*(`{3,}).*?(?:^[ \t]*\1`*[ \t]*$|\Z)", re.MULTILINE | re.DOTALL)
+
+#: `### {m}回目` -- one implementation or review round. Exactly level three:
+#: `#### 判定` and other deeper headings live inside a round.
+_ROUND_HEADING = re.compile(r"^###[ \t]+(\d+)回目[ \t]*$", re.MULTILINE)
+
+#: A verdict line in any of the shapes found in real files: `**VERDICT: FAIL**`,
+#: `### 判定: FAIL`, `判定: **PASS**`, `#### 判定：FAIL`, `Verdict: PASS`.
+_VERDICT = re.compile(
+    r"^[ \t]*(?:#{1,6}[ \t]+)?[*_`]*(?:判定|verdict)[*_`]*[ \t]*[:：][ \t]*[*_`]*(PASS|FAIL)\b",
+    re.MULTILINE | re.IGNORECASE,
+)
+
+#: The team-review template writes `#### 判定: PASS / FAIL` before a verdict is
+#: chosen. A line naming both outcomes is that template, not a verdict.
+_BOTH_OUTCOMES = re.compile(r"\bPASS\b.*\bFAIL\b|\bFAIL\b.*\bPASS\b", re.IGNORECASE)
+
 
 def _strip_value(raw: str) -> str:
     """Trim markdown wrappers from the ends of a field value, leaving it intact.
@@ -76,14 +102,64 @@ def _strip_value(raw: str) -> str:
 
 
 def _is_meaningful(body: str) -> bool:
-    """True when a section body holds real content rather than a placeholder."""
-    cleaned = _HTML_COMMENT.sub("", body).strip()
+    """True when a section body holds real content rather than a placeholder.
+
+    Template comments and bare headings are removed first: a fresh
+    `## startproject` holds `### Brief / Design / Plan` plus comments and
+    nothing else, and that must read as empty.
+    """
+    cleaned = _HEADING_LINE.sub("", _HTML_COMMENT.sub("", body)).strip()
     if len(cleaned) < _MIN_MEANINGFUL_CHARS:
         return False
     # A placeholder is just as much a placeholder when written as a list item:
     # `- N/A` and `- 未着手。` must not count as content.
     cleaned = re.sub(r"\A[-*]\s+", "", cleaned)
     return not _PLACEHOLDER.match(cleaned.translate(_WRAPPERS).strip())
+
+
+def _strip_fences(body: str) -> str:
+    """Drop fenced code blocks so quoted headings and verdicts are not counted."""
+    return _FENCE.sub("", body)
+
+
+def _last_verdict(text: str) -> Verdict | None:
+    """The last real verdict line in `text`, or None."""
+    verdict: Verdict | None = None
+    for match in _VERDICT.finditer(text):
+        newline = text.find("\n", match.start())
+        line = text[match.start() : newline if newline != -1 else len(text)]
+        if _BOTH_OUTCOMES.search(line):
+            continue
+        verdict = "PASS" if match.group(1).upper() == "PASS" else "FAIL"
+    return verdict
+
+
+def _extract_rounds(body: str) -> tuple[int, Verdict | None]:
+    """Return (latest round number, its verdict) for a `## team-review` body.
+
+    The round number is the largest `### {m}回目` present, not the number of
+    such headings: reviewing the same round with a second AI adds a second
+    `### 2回目`. The verdict is the last one written under that round, so a
+    FAIL followed by another AI's PASS on the same round reads as PASS.
+
+    A body without round headings (the older `## Review` layout) is one round
+    when it holds content, and its verdict is taken from the whole body.
+    """
+    text = _strip_fences(body)
+    headings = list(_ROUND_HEADING.finditer(text))
+    if not headings:
+        if not _is_meaningful(text):
+            return 0, None
+        return 1, _last_verdict(text)
+
+    latest = max(int(match.group(1)) for match in headings)
+    verdict: Verdict | None = None
+    for index, match in enumerate(headings):
+        if int(match.group(1)) != latest:
+            continue
+        end = headings[index + 1].start() if index + 1 < len(headings) else len(text)
+        verdict = _last_verdict(text[match.end() : end]) or verdict
+    return latest, verdict
 
 
 def split_sections(text: str) -> dict[str, str]:
@@ -209,6 +285,9 @@ def parse_text(text: str, path: str, mtime: float, size: int) -> ParsedTask:
     filled = frozenset(name for name, body in sections.items() if _is_meaningful(body))
     tags = frozenset(m.lower() for m in _DECISION_ENTRY.findall(sections.get("decision log", "")))
 
+    # The process-named section wins; the older `## Review` is only a fallback.
+    _, verdict = _extract_rounds(sections.get("team-review") or sections.get("review") or "")
+
     return ParsedTask(
         path=path,
         project=project_name(path),
@@ -224,6 +303,7 @@ def parse_text(text: str, path: str, mtime: float, size: int) -> ParsedTask:
         decision_tags=tags,
         mtime=mtime,
         size=size,
+        latest_review_verdict=verdict,
     )
 
 
