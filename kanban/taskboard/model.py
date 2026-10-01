@@ -11,6 +11,7 @@ from dataclasses import dataclass, field
 from typing import Literal
 
 Phase = Literal["planning", "implementing", "review", "deploy", "done", "unknown"]
+Verdict = Literal["PASS", "FAIL"]
 
 #: Column order, lowest to highest. `unknown` is deliberately outside the
 #: ordering: it means "no signal", not "before planning".
@@ -56,6 +57,10 @@ class ParsedTask:
     mtime: float
     size: int
     parse_error: str | None = None
+    #: Verdict of the latest `### {m}回目` under `## team-review` (the last
+    #: `VERDICT: PASS|FAIL` line written for the highest round number). A
+    #: classification-only signal: it is never serialized to JSON.
+    latest_review_verdict: Verdict | None = None
 
 
 @dataclass(frozen=True, slots=True)

@@ -6,7 +6,7 @@ import textwrap
 
 import pytest
 
-from taskboard.parser import parse_text, project_name, split_sections
+from taskboard.parser import _extract_rounds, parse_text, project_name, split_sections
 
 CANONICAL = textwrap.dedent(
     """\
@@ -305,3 +305,162 @@ def test_unreadable_file_becomes_a_card_with_a_parse_error(tmp_path) -> None:
     task = parse_file(str(tmp_path / "task-X-1-missing.md"), 1.0, 0)
     assert task.parse_error is not None
     assert task.task_id == "task-X-1-missing.md"
+
+
+TEMPLATE = textwrap.dedent(
+    """\
+    # Task: ABC-7 — new layout
+
+    ## Meta
+    - linear_id: ABC-7
+    - tier: M
+    - created: 2026-09-30 00:05
+    - status: planning
+    - branch:
+    - base:
+
+    ## startproject
+    ### Brief
+    <!-- orchestrator が startproject の返却 BRIEF から記入 -->
+
+    ### Design
+    <!-- orchestrator が startproject の返却 DESIGN から記入 -->
+
+    ### Plan
+    <!-- orchestrator が startproject の返却 PLAN から記入 -->
+
+    ## team-implement
+    <!-- orchestrator が team-implement の返却 IMPLEMENTATION_NOTES から記入 -->
+
+    ## team-review
+    <!-- orchestrator が team-review の返却 REVIEW から記入 -->
+
+    ## deploy
+    <!-- orchestrator が deploy の返却 DEPLOY から記入 -->
+    """
+)
+
+
+def test_untouched_template_has_no_filled_sections() -> None:
+    """The STEP 2 template ships sub-headings; headings alone are not content."""
+    task = parse(TEMPLATE, "/r/.claude/docs/decisions/task-ABC-7-new.md")
+    # `## Meta` is the only section with content; no process section is filled.
+    assert task.filled_sections == frozenset({"meta"})
+    assert task.latest_review_verdict is None
+
+
+@pytest.mark.parametrize(
+    ("body", "expected"),
+    [
+        ("### Brief\n<!-- x -->\n\n### Design\n<!-- y -->\n\n### Plan\n<!-- z -->\n", False),
+        ("### Brief\nN/A\n", False),
+        ("### Plan\n#### 追加依頼 1\n- 依頼日時: x\n", True),
+        ("### 案 2\n利用AI: pi（2026-09-28 10:00）\n#### Brief\n本文がここに入る\n", True),
+    ],
+)
+def test_heading_only_sections_are_empty(body: str, expected: bool) -> None:
+    task = parse(f"# Task: x\n\n## Meta\n- status: planning\n\n## startproject\n{body}")
+    assert ("startproject" in task.filled_sections) is expected
+
+
+def review_task(review_body: str):
+    text = (
+        "# Task: x\n\n## Meta\n- status: implementing\n\n"
+        f"## team-implement\nImplemented.\n\n## team-review\n{review_body}"
+    )
+    return parse(text)
+
+
+def test_review_rounds_take_the_largest_round_number_and_its_verdict() -> None:
+    body = (
+        "### 1回目\n**VERDICT: FAIL**\n- [major] x\n\n"
+        "### 2回目\n**VERDICT: FAIL**\n- [major] y\n\n"
+        "### 3回目\n**VERDICT: PASS**\n"
+    )
+    assert _extract_rounds(body) == (3, "PASS")
+    assert review_task(body).latest_review_verdict == "PASS"
+
+
+def test_same_round_reviewed_twice_uses_the_last_verdict_written() -> None:
+    """A second AI reviewing the same round adds a second `### 2回目`."""
+    body = (
+        "### 1回目\n**VERDICT: PASS**\n\n"
+        "### 2回目\n利用AI: pi（2026-09-28 10:00）\n\n#### 判定: FAIL\n\n"
+        "### 2回目\n利用AI: codex（2026-09-28 11:00）\n\n#### 判定: PASS\n"
+    )
+    assert _extract_rounds(body) == (2, "PASS")
+    assert review_task(body).latest_review_verdict == "PASS"
+
+
+def test_round_number_is_the_max_not_the_number_of_headings() -> None:
+    body = "### 1回目\n**VERDICT: FAIL**\n\n### 1回目\n**VERDICT: FAIL**\n"
+    assert _extract_rounds(body) == (1, "FAIL")
+
+
+@pytest.mark.parametrize(
+    ("line", "expected"),
+    [
+        ("**VERDICT: FAIL**", "FAIL"),
+        ("### 判定: FAIL", "FAIL"),
+        ("判定: **FAIL**", "FAIL"),
+        ("#### 判定：FAIL", "FAIL"),
+        ("Verdict: PASS", "PASS"),
+        ("#### 判定: PASS", "PASS"),
+        ("- **判定**: PASS", None),
+        ("#### 判定: PASS / FAIL", None),
+        ("The reviewer wrote VERDICT: FAIL in prose", None),
+    ],
+)
+def test_verdict_line_shapes(line: str, expected: str | None) -> None:
+    task = review_task(f"### 1回目\n{line}\n- note\n")
+    assert task.latest_review_verdict == expected
+
+
+def test_verdict_after_the_template_line_still_counts() -> None:
+    body = "### 1回目\n#### 判定: PASS / FAIL\n\n**VERDICT: FAIL**\n"
+    assert review_task(body).latest_review_verdict == "FAIL"
+
+
+def test_rounds_and_verdicts_inside_code_fences_are_ignored() -> None:
+    body = "### 1回目\n**VERDICT: PASS**\n\n```markdown\n### 9回目\n**VERDICT: FAIL**\n```\n"
+    assert _extract_rounds(body) == (1, "PASS")
+    assert review_task(body).latest_review_verdict == "PASS"
+
+
+def test_legacy_review_section_without_round_headings_is_one_round() -> None:
+    body = "### 判定: FAIL\n- [major] z\n"
+    assert _extract_rounds(body) == (1, "FAIL")
+    text = f"# Task: x\n\n## Meta\n- status: implementing\n\n## Review\n{body}"
+    assert parse(text).latest_review_verdict == "FAIL"
+
+
+def test_empty_review_section_has_no_rounds() -> None:
+    assert _extract_rounds("<!-- orchestrator が記入 -->\n") == (0, None)
+    assert review_task("<!-- orchestrator が記入 -->\n").latest_review_verdict is None
+
+
+def test_verdict_of_an_earlier_round_is_ignored() -> None:
+    """A rework round written without a verdict yet has no verdict, not the old FAIL."""
+    body = (
+        "### 1回目\n**VERDICT: FAIL**\n\n### 2回目\n利用AI: pi（2026-09-28 10:00）\n\n- pending\n"
+    )
+    assert _extract_rounds(body) == (2, None)
+
+
+def test_process_named_section_wins_over_legacy_name() -> None:
+    text = (
+        "# Task: x\n\n## Meta\n- status: implementing\n\n"
+        "## team-review\n### 2回目\n**VERDICT: PASS**\n\n"
+        "## Review\n### 判定: FAIL\n"
+    )
+    assert parse(text).latest_review_verdict == "PASS"
+
+
+def test_four_backtick_fence_does_not_swallow_the_rest_of_the_section() -> None:
+    """A ```` fence wrapping a ``` example must close at ````, not run to the end."""
+    body = (
+        "### 1回目\n**VERDICT: FAIL**\n\n"
+        "````bash\nawk '/^```/{fence=!fence}' f\n````\n\n"
+        "### 2回目\n**VERDICT: PASS**\n"
+    )
+    assert _extract_rounds(body) == (2, "PASS")
