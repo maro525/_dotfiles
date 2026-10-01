@@ -10,6 +10,12 @@ allowed-tools: Read, Write, Edit, Bash, Grep, Glob, AskUserQuestion, TodoWrite, 
 
 # deploy
 
+## 今回の引数
+
+$ARGUMENTS
+
+（引数の置き場所はここだけ。本文の「引数」はこの値を指す。Agent ツール経由で起動された場合は、プロンプトの `ARGUMENTS:` 行が引数）
+
 git は `$HOME/.claude/rules/tool-routing.md` の「Git Operations」（保護ブランチ・ホスティング CLI）に従う。
 
 | 引数 | モード |
@@ -19,7 +25,7 @@ git は `$HOME/.claude/rules/tool-routing.md` の「Git Operations」（保護�
 
 ## Ad-hoc Git モード
 
-$ARGUMENTS で指示された書き込み系 git 操作（「Git Operations」の書き込み系）を実行する。
+引数で指示された書き込み系 git 操作（「Git Operations」の書き込み系）を実行する。
 
 - 履歴を書き換える操作（rebase、`reset --hard`、force push）は実行前にユーザーに確認する
 - 完了後、実行したコマンドと結果（コミットハッシュ・ブランチ名・PR/MR URL など）を日本語で簡潔に返す
@@ -46,7 +52,7 @@ grep -l "^- branch: {branch}$" .claude/docs/decisions/task-*.md
 ### Input
 
 ```
-$ARGUMENTS の形式: "{task description} --tier={S|M|L} --task-file={TASK_FILE} --linear-id={LINEAR_ID}"
+引数の形式: "{task description} --tier={S|M|L} --task-file={TASK_FILE} --linear-id={LINEAR_ID}"
 ```
 
 | 引数 | 説明 |

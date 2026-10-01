@@ -8,12 +8,18 @@ allowed-tools: Read, Write, Edit, Bash, Grep, Glob, Agent, Skill, AskUserQuestio
 
 # orchestrate
 
+## 今回の引数
+
+$ARGUMENTS
+
+（引数の置き場所はここだけ。本文の「引数」はこの値を指す。Agent ツール経由で起動された場合は、プロンプトの `ARGUMENTS:` 行が引数）
+
 プロジェクト全体のフローを管理する。各 command の実行・Gate 判定・状態管理を担当し、タスクの実行自体は各 command に委譲する。
 
 ## Input
 
 ```
-$ARGUMENTS の形式: "{task description}"
+引数の形式: "{task description}"
 例: "PROJ-573をやりたいです"
 例: "カート機能にクーポン適用を追加する"
 例（追加修正モード）: "レビュー指摘の型エラーを直す --task-file=.claude/docs/decisions/task-PROJ-573-coupon.md"
@@ -23,7 +29,7 @@ $ARGUMENTS の形式: "{task description}"
 
 ## 実行原則
 
-**$ARGUMENTS を受け取ったら「モード判定」を行い、通常モードは STEP 0 から、追加修正モードは STEP 3F から、フェーズ指定モードは STEP 3P から開始する。通常・追加修正モードは追加の指示がない限り STEP 7 まで完走する。フェーズ指定モードは 1 フェーズを 1 回実行して STEP 7 の報告で終わる。**
+**引数を受け取ったら「モード判定」を行い、通常モードは STEP 0 から、追加修正モードは STEP 3F から、フェーズ指定モードは STEP 3P から開始する。通常・追加修正モードは追加の指示がない限り STEP 7 まで完走する。フェーズ指定モードは 1 フェーズを 1 回実行して STEP 7 の報告で終わる。**
 
 - 全 STEP を自律的に順番に実行する。報告・通知はするが応答を待たずに次へ進む
 - 質問が必要なら質問し、回答を受け取ったら止まらず続行する
@@ -42,7 +48,7 @@ $ARGUMENTS の形式: "{task description}"
 
 ## モード判定
 
-$ARGUMENTS を受け取ったら最初にモードを決め、判定結果（モードと TASK_FILE）をユーザーに報告して続行する。ユーザーが別のモードを指示したらそれに従う。
+引数を受け取ったら最初にモードを決め、判定結果（モードと TASK_FILE）をユーザーに報告して続行する。ユーザーが別のモードを指示したらそれに従う。
 
 | モード | 判定 | 開始 STEP |
 |---|---|---|
@@ -79,7 +85,7 @@ Agent(
   prompt: """
 Read $HOME/.claude/commands/{phase}.md and follow it exactly as your instructions for this run. Ignore its YAML frontmatter.
 
-$ARGUMENTS: "{task description} --tier={tier} --task-file={TASK_FILE} --linear-id={LINEAR_ID}"
+ARGUMENTS: "{task description} --tier={tier} --task-file={TASK_FILE} --linear-id={LINEAR_ID}"
 
 Do not use the Agent tool; do all the work yourself. End your final message with the OUTPUT format the command specifies.
 """
@@ -94,7 +100,7 @@ Do not use the Agent tool; do all the work yourself. End your final message with
 
 ## STEP 1: LINEAR タスク確認
 
-$ARGUMENTS から Linear ID（例: `PROJ-573`）を検出する。
+引数から Linear ID（例: `PROJ-573`）を検出する。
 
 - **検出できた場合:** LINEAR_ID として使用（確認不要）。`mcp__linear-server__get_issue` でタスク詳細を取得してタスク説明を補完し、即 STEP 2 へ
 - **検出できなかった場合:** ユーザーに Linear タスク ID または URL を質問する。既存タスクがあれば ID を取得、なければ `mcp__linear-server__save_issue` で新規作成し、即 STEP 2 へ
@@ -320,7 +326,7 @@ STEP 3F F1 と同じ場所から `LINEAR_ID` / `tier` / task description / `bran
 ```
 Read {SKILL_PATH} and follow it exactly as your instructions for this run.
 
-$ARGUMENTS: "{task description} --task-file={TASK_FILE の絶対パス} --tier={tier} --linear-id={LINEAR_ID} --label={label}"
+ARGUMENTS: "{task description} --task-file={TASK_FILE の絶対パス} --tier={tier} --linear-id={LINEAR_ID} --label={label}"
 
 Current date and time: {YYYY-MM-DD HH:MM}. Use this value wherever the skill needs a timestamp; do not guess one.
 
@@ -475,7 +481,7 @@ orchestrator は以下を変数として保持し、全 command に引数で渡�
 |---|---|
 | `tier` | STEP 0（追加修正モードは STEP 3F F1 で `## Meta` の `tier:` から復元。F3 の再設計で更新） |
 | `LINEAR_ID` | STEP 1（追加修正モードは STEP 3F F1 で `## Meta` の `linear_id:` から復元） |
-| `TASK_FILE` | STEP 2（追加修正モードは $ARGUMENTS または Linear ID から特定。フェーズ指定モードは $ARGUMENTS の `--task-file` 必須） |
+| `TASK_FILE` | STEP 2（追加修正モードは引数または Linear ID から特定。フェーズ指定モードは引数の `--task-file` 必須） |
 
 作業ブランチとその分岐元は、引数ではなく TASK_FILE の `## Meta` の `branch:` / `base:` で受け渡す（STEP 4 で記入。追加修正モードでは既存の値をそのまま使う。フェーズ指定モードの team-implement は外部 CLI が書き、未書き込みなら P4 で代筆する）。
 

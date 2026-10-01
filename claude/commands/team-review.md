@@ -10,6 +10,12 @@ allowed-tools: Read, Write, Bash, Grep, Glob, Agent, Skill, AskUserQuestion, Tod
 
 # team-review
 
+## 今回の引数
+
+$ARGUMENTS
+
+（引数の置き場所はここだけ。本文の「引数」はこの値を指す。Agent ツール経由で起動された場合は、プロンプトの `ARGUMENTS:` 行が引数）
+
 レビューフェーズを担当。
 
 **TASK_FILE への書き込みと Linear への投稿は行わない。** 結果は OUTPUT フォーマットで呼び出し元（`/orchestrate` STEP 5）に返し、TASK_FILE の更新・Linear コメント投稿は呼び出し元が行う。TASK_FILE は Read のみ。
@@ -17,7 +23,7 @@ allowed-tools: Read, Write, Bash, Grep, Glob, Agent, Skill, AskUserQuestion, Tod
 ## Input
 
 ```
-$ARGUMENTS の形式: "{task description} --tier={S|M|L} --task-file={TASK_FILE} --linear-id={LINEAR_ID}"
+引数の形式: "{task description} --tier={S|M|L} --task-file={TASK_FILE} --linear-id={LINEAR_ID}"
 ```
 
 | 引数 | 説明 |
