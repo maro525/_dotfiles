@@ -36,5 +36,14 @@ sync_common::sync_directory "$SOURCE/commands" "$DEST/commands" "*.md" "${HARNES
 # skills (recursive — includes nested SKILL.md and assets)
 sync_common::sync_directory "$SOURCE/skills" "$DEST/skills" "*" "${SKILL_EXCLUDES[@]}" || true
 
+# Cross-repo 参照チェック（harness 側の checks/crossrefs.sh の「契約」を参照）。
+# harness/opencode と opencode/AGENTS.md の相互参照（節名・ファイル名）が壊れて
+# いないかを確認する。失敗しても同期は成功扱い（警告のみ）。
+HARNESS_DIR="${HARNESS:-$HOME/src/harness}"
+if [[ -f "$HARNESS_DIR/checks/crossrefs.sh" ]]; then
+  bash "$HARNESS_DIR/checks/crossrefs.sh" "$SCRIPT_DIR" ||
+    echo "Warning: cross-repo 参照チェックに失敗（上記 NG を確認）" >&2
+fi
+
 echo ""
 echo "Done."

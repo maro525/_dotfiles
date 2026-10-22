@@ -6,6 +6,8 @@
 
 ## ADAPTIVE EXECUTION
 
+> 正: harness の `claude/rules/adaptive-execution.md`。ここは OpenCode 向けの要約（差分が出たら harness 側に合わせる。tier 別のモデル表は Claude 専用なのでここには無い）。
+
 `tier = max(file_tier, complexity_tier, risk_tier)`:
 
 | Tier | Files | Complexity | Risk |
@@ -27,6 +29,8 @@ XS は `/orchestrate` を使わず直接実装する。
 - 音声・動画は委託先なし。ユーザーに扱い方を確認する
 
 ## GIT RULES
+
+> 正: harness の `claude/rules/tool-routing.md`「Git Operations」。ここは OpenCode 向けの要約。
 
 - **書き込み系**（add / commit / push / pull / merge / rebase / cherry-pick / tag 作成 / stash push・pop・apply / reset / revert / branch 作成 / checkout / switch）は `/deploy`（Ad-hoc Git モード）経由で実行する。フェーズ agent（`team-implement` / `team-review` / `deploy`）の内部では直接実行してよい
 - **読み取り系**（status / log / diff / show / blame / branch 一覧 / fetch / stash list・show / rev-parse / config --get）は直接実行してよい
