@@ -18,7 +18,7 @@
 **Hard Triggers（自動 L）:** 認証・DB migration・支払い・公開API変更・新規コア依存追加。
 XS は `/orchestrate` を使わず直接実装する。
 
-**エスカレーション（上方向のみ）:** 計画後・実装 30-40% 時点・レビュー前に tier を再評価し、ファイル数が閾値を超えた／未解決の設計問題が積み上がった／新依存を追加した／リスク次元が変わった（例: 想定外に認証コードに触れた）場合は tier を引き上げる。手順は `agents/team-implement.md`（`ESCALATION` 返却）と `commands/orchestrate.md` STEP 4-1。
+**エスカレーション（上方向のみ）:** 計画後・実装 30-40% 時点・レビュー前に tier を再評価し、ファイル数が閾値を超えた／未解決の設計問題が積み上がった／新依存を追加した／リスク次元が変わった（例: 想定外に認証コードに触れた）場合は tier を引き上げる。手順は外部ワークフローを導入していれば `agents/team-implement.md`（`ESCALATION` 返却）と `commands/orchestrate.md` STEP 4-1 に従う。
 
 ## ROUTING NOTES
 
