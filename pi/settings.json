@@ -1,9 +1,9 @@
 {
-  "defaultModel": "glm-5.3",
-  "defaultProvider": "opencode-go",
+  "defaultModel": "deepseek-v4.1-flash:1017",
+  "defaultProvider": "ollama-cloud",
   "defaultThinkingLevel": "high",
   "hideThinkingBlock": true,
-  "lastChangelogVersion": "0.84.3",
+  "lastChangelogVersion": "1.4.0",
   "packages": [
     "npm:pi-subagents",
     "npm:@ollama/pi-web-search",
