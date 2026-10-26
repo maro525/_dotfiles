@@ -7,7 +7,8 @@
   "packages": [
     "npm:pi-subagents",
     "npm:@ollama/pi-web-search",
-    "npm:pi-opencode-bridge"
+    "npm:pi-opencode-bridge",
+    "npm:pi-ollama-cloud"
   ],
   "theme": "dark"
 }
