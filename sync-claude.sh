@@ -26,7 +26,12 @@ SKILL_EXCLUDES=("${SYNC_COMMON_CLOUDFLARE_SKILLS[@]}" synced)
 # committed to this repo.
 EXTERNAL_COMMANDS=(orchestrate.md startproject.md team-implement.md team-review.md deploy.md)
 EXTERNAL_RULES=(adaptive-execution.md tool-routing.md)
-EXTERNAL_HOOKS=(agent-router.py)
+
+# agent-router.py belongs to the external workflow repo above. herdr-agent-state.sh
+# is generated and managed by herdr's Claude Code integration (it says so in its
+# own header) and is overwritten on every herdr update, so it is vendor content
+# like the Cloudflare skills — not personal config.
+EXTERNAL_HOOKS=(agent-router.py herdr-agent-state.sh)
 
 # Top-level config files
 sync_common::sync_file "$SOURCE/CLAUDE.md"     "$DEST/CLAUDE.md"     "CLAUDE.md" || true
