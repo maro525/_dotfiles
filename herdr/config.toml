@@ -19,6 +19,10 @@ new_cwd = "follow"
 # ctrl+space is grabbed by fcitx5/mozc (Hotkey/TriggerKeys), so use herdr's own default
 prefix = "ctrl+b"
 
+# Agent panes
+previous_agent = "alt+h"
+next_agent = "alt+l"
+
 # Config and help
 reload_config = "prefix+q"
 help = "prefix+?"
