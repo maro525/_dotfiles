@@ -19,9 +19,10 @@ new_cwd = "follow"
 # ctrl+space is grabbed by fcitx5/mozc (Hotkey/TriggerKeys), so use herdr's own default
 prefix = "ctrl+b"
 
-# Agent panes
-previous_agent = "alt+h"
-next_agent = "alt+l"
+# Agent panes. The prefix chords exist for Moshi (mobile): its gestures can
+# only send prefix-key sequences, so the swipe binding uses prefix+shift+h/l.
+previous_agent = ["alt+h", "prefix+shift+h"]
+next_agent = ["alt+l", "prefix+shift+l"]
 
 # Config and help
 reload_config = "prefix+q"
