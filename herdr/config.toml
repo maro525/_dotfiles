@@ -19,12 +19,12 @@ new_cwd = "follow"
 # ctrl+space is grabbed by fcitx5/mozc (Hotkey/TriggerKeys), so use herdr's own default
 prefix = "ctrl+b"
 
-# Agent panes. The prefix chords exist for Moshi (mobile): its gestures can
-# only send prefix-key sequences, so the swipe binding uses prefix+shift+h/l.
-# herdr defaults swap_pane_left/right to prefix+shift+h/l, so those two are
-# moved to prefix+alt+h/l below - otherwise the swap binding wins the chord.
-previous_agent = ["alt+h", "prefix+shift+h"]
-next_agent = ["alt+l", "prefix+shift+l"]
+# Agent panes. Bare prefix+h/l and the shift chords are for Moshi (mobile):
+# its gestures can only send prefix-key sequences.
+# prefix+h used to be split_horizontal; that moved to prefix+minus (herdr's
+# default) so h/l can navigate agents.
+previous_agent = ["alt+h", "prefix+h", "prefix+shift+h"]
+next_agent = ["alt+l", "prefix+l", "prefix+shift+l"]
 
 # Config and help
 reload_config = "prefix+q"
@@ -35,7 +35,7 @@ detach = "prefix+d"
 copy_mode = "prefix+["
 
 # Panes
-split_horizontal = ["prefix+h", "alt+enter"]
+split_horizontal = ["prefix+minus", "alt+enter"]
 split_vertical = ["prefix+v", "alt+shift+enter"]
 close_pane = ["prefix+x", "alt+esc"]
 zoom = "prefix+z"
