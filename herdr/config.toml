@@ -21,6 +21,8 @@ prefix = "ctrl+b"
 
 # Agent panes. The prefix chords exist for Moshi (mobile): its gestures can
 # only send prefix-key sequences, so the swipe binding uses prefix+shift+h/l.
+# herdr defaults swap_pane_left/right to prefix+shift+h/l, so those two are
+# moved to prefix+alt+h/l below - otherwise the swap binding wins the chord.
 previous_agent = ["alt+h", "prefix+shift+h"]
 next_agent = ["alt+l", "prefix+shift+l"]
 
@@ -43,6 +45,13 @@ focus_pane_left = "ctrl+alt+left"
 focus_pane_down = "ctrl+alt+down"
 focus_pane_up = "ctrl+alt+up"
 focus_pane_right = "ctrl+alt+right"
+
+# herdr's defaults (prefix+shift+h/l/k) are taken by agent navigation and
+# close_workspace, so the pane swaps move here instead.
+swap_pane_left = "prefix+alt+h"
+swap_pane_down = "prefix+shift+j"
+swap_pane_up = "prefix+alt+k"
+swap_pane_right = "prefix+alt+l"
 
 resize_mode = ["prefix+ctrl+left", "prefix+ctrl+down", "prefix+ctrl+up", "prefix+ctrl+right"]
 
