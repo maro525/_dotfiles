@@ -116,6 +116,8 @@ const ALLOW_PATTERNS = [
   "git merge **",
   "git push",
   "git push **",
+  "git pull",
+  "git pull **",
   "git remote get-url **",
   "git stash",
   "git stash **",
