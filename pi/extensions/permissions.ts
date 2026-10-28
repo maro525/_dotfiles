@@ -17,6 +17,7 @@
 
 import type { BashOperations, ExtensionAPI } from "@mariozechner/pi-coding-agent";
 import { createBashTool, createLocalBashOperations } from "@mariozechner/pi-coding-agent";
+import { homedir } from "node:os";
 
 // ─── Atuin History Tracking ──────────────────────────────────────────────────
 
@@ -190,7 +191,6 @@ const ALLOW_PATTERNS = [
   "opencode run **",
   // harness (pi orchestrator): phase dispatch and finalize
   "~/.claude/scripts/**",
-  "/home/hidem/.claude/scripts/**",
   "./.claude/scripts/**",
 ];
 
@@ -233,7 +233,16 @@ function globToRegex(pattern: string): RegExp {
 }
 
 // Pre-compile all patterns
-const ALLOW_RE = ALLOW_PATTERNS.map(globToRegex);
+//
+// A `~/...` allow pattern also matches the absolute form of the same path, so a
+// command passes whether it spells out the home directory or not. Doing it here
+// keeps hard-coded home paths out of the pattern lists.
+function withHomeExpanded(pattern: string): string[] {
+  if (!pattern.startsWith("~/")) return [pattern];
+  return [pattern, `${homedir()}/${pattern.slice(2)}`];
+}
+
+const ALLOW_RE = ALLOW_PATTERNS.flatMap(withHomeExpanded).map(globToRegex);
 const DENY_RE = DENY_PATTERNS.map(globToRegex);
 const ASK_RE = ASK_PATTERNS.map(globToRegex);
 
