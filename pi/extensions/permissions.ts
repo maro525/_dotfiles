@@ -119,8 +119,12 @@ const ALLOW_PATTERNS = [
   "git remote get-url **",
   "git stash",
   "git stash **",
+  "git switch",
+  "git switch **",
   "git status",
   "git status **",
+  "git worktree",
+  "git worktree **",
   // Node / npm / pnpm
   "npm install",
   "npm install **",
@@ -182,6 +186,10 @@ const ALLOW_PATTERNS = [
   // Agent tools
   "agent-browser **",
   "opencode run **",
+  // harness (pi orchestrator): phase dispatch and finalize
+  "~/.claude/scripts/**",
+  "/home/hidem/.claude/scripts/**",
+  "./.claude/scripts/**",
 ];
 
 /**
