@@ -16,8 +16,10 @@ sync_common::show_header "$(basename "$0")"
 # Cloudflare plugin skills are vendor content — see SYNC_COMMON_CLOUDFLARE_SKILLS.
 # skills/synced/ is managed by Claude Code itself (Anthropic-provided skills
 # synced from the claude.ai account, re-created on every launch), so it is not
-# personal config either.
-SKILL_EXCLUDES=("${SYNC_COMMON_CLOUDFLARE_SKILLS[@]}" synced)
+# personal config either. herdr-boss is placed by the external workflow repo
+# (like EXTERNAL_COMMANDS below), so it is excluded by name too.
+EXTERNAL_SKILLS=(herdr-boss)
+SKILL_EXCLUDES=("${SYNC_COMMON_CLOUDFLARE_SKILLS[@]}" synced "${EXTERNAL_SKILLS[@]}")
 
 # Files that external workflow repositories place in ~/.claude (the /orchestrate
 # commands, its rules and its hook). dotfiles does not own them, so they are
