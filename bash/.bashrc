@@ -109,6 +109,10 @@ command -v starship >/dev/null && eval "$(starship init bash)"
 
 [ -f "$HOME/.atuin/bin/env" ] && . "$HOME/.atuin/bin/env"
 
+# atuin 18 の bash 連携は preexec/precmd 配列 (preexec_functions 等) を外部
+# フレームワークに任せる実装で、bash-preexec.sh がないとコマンドが履歴に
+# 記録されない (2026-11 実測: bash-preexec なしでは 0 件記録)。
+# 必ず atuin init より先に読むこと。
 if command -v atuin >/dev/null; then
     [[ -f ~/.bash-preexec.sh ]] && source ~/.bash-preexec.sh
     eval "$(atuin init bash)"
