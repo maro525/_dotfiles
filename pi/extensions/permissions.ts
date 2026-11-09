@@ -192,6 +192,9 @@ const ALLOW_PATTERNS = [
   // harness (pi orchestrator): phase dispatch and finalize
   "~/.claude/scripts/**",
   "./.claude/scripts/**",
+  // Herdr: pane/tab/workspace control (the scripts use it internally, and it is
+  // also useful directly — inspect panes, read an agent, start a session).
+  "herdr **",
 ];
 
 /**
