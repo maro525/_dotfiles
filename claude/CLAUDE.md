@@ -6,7 +6,7 @@ TIME ZONE
 
 GPT のレビュー（このPC）
   本物の codex はこのPCでは gpt-6 に届かない。自分で呼ぶときは opencode を使う（外部ワークフローを導入していれば `~/.claude/rules/tool-routing.md` の「OpenCode リサーチの実行」に注意点がある）
-  timeout -k 1m 20m opencode run --agent plan -m github-copilot/gpt-6-astra "{prompt}" < /dev/null
+  timeout -k 1m 20m opencode run --agent plan -m ollama-cloud/deepseek-v4.1-flash "{prompt}" < /dev/null
   `codex` コマンドは ~/scripts/codex-opencode-shim.mjs へのリンク（~/.local/bin/codex）で、opencode に読み替える。
   codex を直接呼ぶスクリプト（review-eval.mjs・review-weekly-gpt6.sh）はこれで動く。通すのは exec --sandbox read-only だけ。リンクを消せば本物に戻る
   MR やスレッドに書く役の名前は gpt-6 のまま。この経路で出した Review-Eval: の数字には「opencode 経由」と書き添える
