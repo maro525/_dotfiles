@@ -22,5 +22,3 @@ htmlcov/
 .claude/docs/decisions/*
 !.claude/docs/decisions/.gitkeep
 
-# yomiyasu の assets は画像のみ（スキルから参照されていない）のでリポジトリに置かない
-claude/skills/yomiyasu/assets/
