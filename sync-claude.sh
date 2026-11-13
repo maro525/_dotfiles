@@ -18,7 +18,13 @@ sync_common::show_header "$(basename "$0")"
 # synced from the claude.ai account, re-created on every launch), so it is not
 # personal config either. herdr-boss is placed by the external workflow repo
 # (like EXTERNAL_COMMANDS below), so it is excluded by name too.
-EXTERNAL_SKILLS=(herdr-boss)
+#
+# yomiyasu is a git clone: ~/.claude/skills/yomiyasu is a symlink to
+# ~/src/yomiyasu/skills/yomiyasu (upstream nanaism/yomiyasu). Its content is
+# owned by that repository — update with `git -C ~/src/yomiyasu pull` — so this
+# repo must not keep a copy. The walk below does not follow the symlink either
+# way; the name is listed so the intent is explicit.
+EXTERNAL_SKILLS=(herdr-boss yomiyasu)
 SKILL_EXCLUDES=("${SYNC_COMMON_CLOUDFLARE_SKILLS[@]}" synced "${EXTERNAL_SKILLS[@]}")
 
 # Files that external workflow repositories place in ~/.claude (the /orchestrate
