@@ -1,3 +1,7 @@
+# --- Omarchy integration (kept from the machine's stock ~/.bashrc) ---
+# OMARCHY_PATH/PATH are needed even for non-interactive shells.
+[[ -r /usr/share/omarchy/default/bash/env-bootstrap ]] && source /usr/share/omarchy/default/bash/env-bootstrap
+
 # ~/.bashrc: executed by bash(1) for non-login shells.
 # see /usr/share/doc/bash/examples/startup-files (in the package bash-doc)
 # for examples
@@ -7,6 +11,9 @@ case $- in
     *i*) ;;
       *) return;;
 esac
+
+# All the default Omarchy aliases and functions (override them below if needed)
+[[ -r "$OMARCHY_PATH/default/bash/rc" ]] && source "$OMARCHY_PATH/default/bash/rc"
 
 # don't put duplicate lines or lines starting with space in the history.
 # See bash(1) for more options
