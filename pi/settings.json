@@ -2,13 +2,17 @@
   "defaultModel": "deepseek-v4.1-flash:1017",
   "defaultProvider": "ollama-cloud",
   "defaultThinkingLevel": "high",
-  "hideThinkingBlock": true,
-  "lastChangelogVersion": "1.4.0",
+  "hideThinkingBlock": false,
+  "lastChangelogVersion": "1.5.2",
   "packages": [
     "npm:pi-subagents",
     "npm:@ollama/pi-web-search",
     "npm:pi-opencode-bridge",
     "npm:pi-ollama-cloud"
   ],
-  "theme": "dark"
+  "theme": "dark",
+  "extensionChangelogVersions": {
+    "{\"source\":\"npm:pi-subagents\",\"scope\":\"user\"}": "0.88.1",
+    "{\"source\":\"npm:pi-ollama-cloud\",\"scope\":\"user\"}": "0.13.1"
+  }
 }

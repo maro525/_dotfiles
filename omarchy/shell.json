@@ -1,14 +1,56 @@
 {
-  "version": 1,
-  "idle": {
-    "screensaver": 0,
-    "lock": 600
-  },
   "bar": {
-    "position": "top",
-    "transparent": false,
-    "centerAnchor": "omarchy.clock",
+    "background": "none",
     "layout": {
+      "center": [
+        {
+          "format": "ddd yyyy-MM-dd HH:mm",
+          "formatAlt": "d MMMM 'W'ww yyyy",
+          "id": "omarchy.clock",
+          "verticalFormat": "HH\n—\nmm"
+        }
+      ],
+      "centerBegin": [
+        {
+          "id": "omarchy.indicators"
+        }
+      ],
+      "centerEnd": [
+        {
+          "cities": [
+            {
+              "name": "Tokyo",
+              "zone": "Asia/Tokyo"
+            },
+            {
+              "name": "Los Angeles",
+              "zone": "America/Los_Angeles"
+            },
+            {
+              "name": "New York",
+              "zone": "America/New_York"
+            },
+            {
+              "name": "London",
+              "zone": "Europe/London"
+            },
+            {
+              "name": "Dubai",
+              "zone": "Asia/Dubai"
+            }
+          ],
+          "id": "omarchy.elsewhen"
+        },
+        {
+          "id": "omarchy.weather"
+        },
+        {
+          "id": "omamail"
+        },
+        {
+          "id": "omarchy.system-update"
+        }
+      ],
       "left": [
         {
           "id": "omarchy.menu"
@@ -17,29 +59,12 @@
           "id": "omarchy.workspaces"
         }
       ],
-      "center": [
-        {
-          "id": "omarchy.indicators"
-        },
-        {
-          "id": "omarchy.clock",
-          "format": "ddd yyyy-MM-dd HH:mm",
-          "formatAlt": "d MMMM 'W'ww yyyy",
-          "verticalFormat": "HH\n—\nmm"
-        },
-        {
-          "id": "omarchy.keyboard-layout"
-        },
-        {
-          "id": "omarchy.weather"
-        },
-        {
-          "id": "omarchy.system-update"
-        }
-      ],
       "right": [
         {
           "id": "omarchy.tray"
+        },
+        {
+          "id": "omarchy.keyboard-layout"
         },
         {
           "id": "omarchy.agents"
@@ -59,8 +84,15 @@
         {
           "id": "omarchy.power"
         }
-      ]
-    }
+      ],
+      "tray": []
+    },
+    "position": "top"
   },
-  "plugins": []
+  "idle": {
+    "lock": 600,
+    "screensaver": 0
+  },
+  "plugins": [],
+  "version": 1
 }
