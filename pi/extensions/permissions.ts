@@ -95,6 +95,8 @@ const ALLOW_PATTERNS = [
   "bq ls **",
   "bq query **",
   "bq show **",
+  "gh issue",
+  "gh issue **",
   "gh pr create **",
   "gh pr **",
   "gh run **",
