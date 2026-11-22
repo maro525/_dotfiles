@@ -3,16 +3,14 @@
   "defaultProvider": "ollama-cloud",
   "defaultThinkingLevel": "high",
   "hideThinkingBlock": false,
-  "lastChangelogVersion": "1.5.2",
+  "lastChangelogVersion": "1.6.0",
   "packages": [
-    "npm:pi-subagents",
     "npm:@ollama/pi-web-search",
-    "npm:pi-opencode-bridge",
-    "npm:pi-ollama-cloud"
+    "npm:pi-ollama-cloud",
+    "git:github.com/michael-denyer/pstack-claude"
   ],
   "theme": "dark",
   "extensionChangelogVersions": {
-    "{\"source\":\"npm:pi-subagents\",\"scope\":\"user\"}": "0.88.1",
     "{\"source\":\"npm:pi-ollama-cloud\",\"scope\":\"user\"}": "0.13.1"
   }
 }
