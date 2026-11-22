@@ -3,7 +3,7 @@
 # Same direction as sync-opencode.sh: HOME -> repo (snapshot).
 #
 # auth.json / sessions/ / bin/ / node_modules はリポジトリに含めない。
-# 同期対象は pi 基本設定のみ (AGENTS.md / settings.json / permissions.ts)。
+# 同期対象は pi 基本設定のみ (AGENTS.md / settings.json / pstack-models.md / permissions.ts)。
 
 set -euo pipefail
 
@@ -22,6 +22,9 @@ sync_common::sync_file "$SOURCE/AGENTS.md" "$DEST/AGENTS.md" "pi/AGENTS.md" || t
 
 # Top-level pi config
 sync_common::sync_file "$SOURCE/settings.json" "$DEST/settings.json" "settings.json" || true
+
+# pstack のモデル上書きシート
+sync_common::sync_file "$SOURCE/pstack-models.md" "$DEST/pstack-models.md" "pstack-models.md" || true
 
 # Extensions
 #   permissions/    : directory extension -> repo に flat な permissions.ts として保存
